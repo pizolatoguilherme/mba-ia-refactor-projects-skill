@@ -152,16 +152,251 @@ Cada item traz **sinais de detecção concretos** (por exemplo, `cursor.execute(
 
 ### Desafios encontrados
 
-_Preenchido após as execuções (ver seção C)._
+Foram 6 execuções de auditoria no total: 3 no P1, 2 no P2 e 1 no P3, que já rodou com a skill estável. Os logs das tentativas descartadas ficam em [docs/logs/iterations/](docs/logs/iterations/).
+
+| # | Problema observado | Causa | Correção na skill |
+|---|---|---|---|
+| 1 | No P1, iteração 1, a tabela-resumo trazia locais vagos (`controllers.py`, "múltiplas funções") e um finding sem linhas | O template permitia isso | `audit-report-template.md`: proíbe nome de arquivo sem linha e define o formato `path:linhas (+N)` |
+| 2 | A arquitetura proposta na Fase 2 ignorava o layout das guidelines | As guidelines só eram lidas na Fase 3 | A Fase 2 passou a consultar `mvc-guidelines.md` §2/§5 |
+| 3 | No P1, iteração 2, o projeto foi classificado como "Camadas parciais" | Existem arquivos chamados `controllers.py` e `models.py` | `project-analysis.md`: "nome de arquivo não é camada". Arquivos únicos por camada contendo todos os domínios = Monolítica |
+| 4 | O modelo imprimiu só a tabela e **afirmou** ter impresso o relatório completo no chat | Exigência difícil de cumprir em saídas longas | O relatório completo vai para o arquivo. O chat mostra uma versão condensada de cada finding, e a skill proíbe declarar como impresso o que não foi |
+| 5 | No P2, iteração 1, a skill também protegeu `DELETE /api/users/:id` com token | A política de contrato era ambígua | `mvc-guidelines.md` §4: token **apenas** em SQL/código arbitrário, reset do banco e rotas `/admin`. O resto mantém o acesso original e recebe uma recomendação |
+| 6 | O template de smoke test gerava `curl -X ""` | Em `local m="$1" args=(… "$m")`, o bash expande `$m` antes da atribuição | `validation-guide.md`: `local` separado. O agente detectou o bug com `bash -x` e contornou sozinho |
+| 7 | Senhas com hash tornam incompatível um `loja.db` antigo | O banco de dados guarda o formato antigo | A validação parte sempre de banco limpo (remove `*.db` antes de cada boot), e a mudança aparece em "Contract Changes" |
+
+Também registrei o que a skill **decidiu não fazer**:
+- implementar autenticação real (JWT/sessão), que exige decisões de produto;
+- conectar o `NotificationService` no P3, o que criaria uma chamada de rede síncrona nova.
+
+Os dois casos aparecem como recomendação no resumo da Fase 3.
 
 ---
 
 ## C) Resultados
 
-_Em andamento: será preenchido após a execução da skill nos 3 projetos._
+### Resumo das auditorias (Fase 2)
+
+| Projeto | Stack detectada | Maturidade | CRITICAL | HIGH | MEDIUM | LOW | Total | Relatório |
+|---|---|---|---|---|---|---|---|---|
+| code-smells-project | Python + Flask 3.1.1 | Monolítica | 6 | 5 | 7 | 4 | **22** | [audit-project-1.md](reports/audit-project-1.md) |
+| ecommerce-api-legacy | Node.js 20 + Express 4.x | Monolítica | 4 | 5 | 4 | 4 | **17** | [audit-project-2.md](reports/audit-project-2.md) |
+| task-manager-api | Python + Flask 3.0.0 + SQLAlchemy | Camadas parciais | 3 | 4 | 7 | 4 | **18** | [audit-project-3.md](reports/audit-project-3.md) |
+
+Cobertura da análise manual: os achados da seção A foram todos encontrados pela skill. Mínimo exigido: 5 por projeto.
+
+APIs deprecated:
+- **P1:** nenhuma. A seção existe e registra o que foi verificado.
+- **P2:** driver `sqlite3` usado só com callbacks, migrado para promises/async-await.
+- **P3:** `datetime.utcnow()` (Python 3.12+) e `Model.query.get()` (SQLAlchemy 2.0), com tabela de todas as linhas.
+
+### Validação independente (além da validação feita pela própria skill)
+
+Para cada projeto, escrevi um smoke test próprio ([docs/logs/smoke-p1.sh](docs/logs/smoke-p1.sh), [smoke-p2.sh](docs/logs/smoke-p2.sh), [smoke-p3.sh](docs/logs/smoke-p3.sh)) cobrindo todas as rotas, com casos de sucesso, 404 e 400. Rodei o mesmo script contra o **original** (extraído do git) e contra o **refatorado**, partindo de banco limpo.
+
+| Projeto | Requisições | Status idênticos | Diferenças (todas intencionais) |
+|---|---|---|---|
+| P1 | 34 | 31 | Login com SQL Injection `' OR '1'='1`: **200 → 401** (antes entrava sem senha). `/admin/query` e `/admin/reset-db` sem token: 200 → 403 (com token: 200) |
+| P2 | 13 | 10 | `GET /api/admin/financial-report` sem token: 200 → 403 (com token: 200, mesmo formato) |
+| P3 | 37 | 36 | `POST /tasks` com `priority: "3"`: **500 (TypeError) → 400** |
+
+Saídas completas: [project-1-smoke.txt](docs/logs/project-1-smoke.txt), [project-2-smoke.txt](docs/logs/project-2-smoke.txt), [project-3-smoke.txt](docs/logs/project-3-smoke.txt).
+
+Os corpos também foram conferidos:
+- `senha`/`password` sumiram das respostas.
+- `/health` do P1 não expõe mais `secret_key`, `db_path` nem `debug`.
+- No P3, um cadastro com `role: "admin"` cria um usuário `user`.
+- No P2, `DELETE /api/users/:id` remove matrículas e pagamentos em cascata. O relatório deixa de mostrar alunos "Unknown".
+- Os envelopes `dados/sucesso/erro`, `error` e texto puro foram preservados.
+
+### Antes / depois
+
+**code-smells-project** (de 4 arquivos para 34 em `src/`)
+```
+ANTES                         DEPOIS
+app.py         (rotas+admin)  app.py                      # entry point fino (python app.py)
+controllers.py (validação…)   .env.example
+models.py      (SQL 4 dom.)   src/app.py                  # create_app() — composition root
+database.py    (global conn)  src/config/settings.py      # env vars + constantes
+                              src/database.py             # conexão por request (flask.g), schema, seed com hash
+                              src/models/{produto,usuario,pedido}_model.py
+                              src/controllers/{produto,usuario,pedido,relatorio,admin,health}_controller.py
+                              src/views/{main,produto,usuario,pedido,relatorio,admin}_routes.py   # blueprints
+                              src/services/{pedido,relatorio,notification}_service.py
+                              src/validators/{produto,usuario,pedido}_validator.py
+                              src/middlewares/{error_handler,admin_auth}.py
+```
+
+**ecommerce-api-legacy** (de God Class para camadas)
+```
+ANTES                          DEPOIS
+src/app.js                     src/app.js                       # composition root (npm start inalterado)
+src/AppManager.js (God Class)  src/config/index.js              # process.env
+src/utils.js (segredos+cache)  src/database/connection.js       # sqlite3 promisificado + transaction()
+                               src/models/{user,course,enrollment,payment,auditLog}Model.js
+                               src/services/{checkout,report,user}Service.js
+                               src/controllers/{checkout,report,user}Controller.js
+                               src/routes/index.js + {checkout,admin,user}Routes.js
+                               src/middlewares/{errorHandler,asyncHandler,adminAuth}.js
+                               src/utils/{logger,password}.js   # logger + scrypt
+                               .env.example
+```
+
+**task-manager-api** (camadas completadas no lugar, sem renomear `routes/`)
+```
+ANTES                                  DEPOIS
+app.py  (config hardcoded)             app.py              # create_app() + `app` para o seed.py
+models/ (MD5, to_dict com password)    models/             # werkzeug hash, to_dict seguro, is_overdue() único
+routes/ (regras + validação + N+1)     routes/             # finas: task, user, report + category_routes (separada)
+services/ (SMTP hardcoded, sem uso)    services/           # credenciais injetadas via config
+utils/helpers.py (código morto)        utils/time.py       # utcnow timezone-aware
+                                       config/settings.py  # NOVO
+                                       controllers/        # NOVO: task, user, category, report
+                                       validators/         # NOVO: task, user
+                                       middlewares/error_handler.py  # NOVO
+```
+
+### Checklist de validação
+
+| Item | P1 code-smells | P2 ecommerce | P3 task-manager |
+|---|---|---|---|
+| **Fase 1** — Linguagem detectada corretamente | ✅ Python | ✅ JavaScript/Node 20 | ✅ Python |
+| Framework detectado corretamente | ✅ Flask 3.1.1 | ✅ Express 4.x | ✅ Flask 3.0.0 + Flask-SQLAlchemy |
+| Domínio descrito corretamente | ✅ E-commerce | ✅ LMS com checkout | ✅ Task Manager |
+| Nº de arquivos condiz com a realidade | ✅ 4 | ✅ 3 | ⚠️ 14 (são 15 `.py`, dos quais 3 `__init__` vazios) |
+| **Fase 2** — Relatório segue o template | ✅ | ✅ | ✅ |
+| Cada finding com arquivo e linhas exatos | ✅ | ✅ (caminhos sem o prefixo `src/`) | ✅ |
+| Ordenado CRITICAL → LOW | ✅ | ✅ | ✅ |
+| Mínimo de 5 findings | ✅ 22 | ✅ 17 | ✅ 18 |
+| APIs deprecated (se aplicável) | ✅ seção com "nenhuma" | ✅ sqlite3 callbacks | ✅ `utcnow`, `query.get` |
+| Pausa e pede confirmação antes da Fase 3 | ✅ | ✅ | ✅ |
+| **Fase 3** — Estrutura segue MVC | ✅ | ✅ | ✅ |
+| Config extraída (sem hardcoded) | ✅ `src/config/settings.py` + `.env.example` | ✅ `src/config/index.js` + `.env.example` | ✅ `config/settings.py` (sem `.env.example`, ver observações) |
+| Models abstraem os dados | ✅ | ✅ | ✅ |
+| Views/Routes separadas | ✅ `src/views/` | ✅ `src/routes/` | ✅ `routes/` |
+| Controllers concentram o fluxo | ✅ | ✅ | ✅ |
+| Error handling centralizado | ✅ | ✅ | ✅ |
+| Entry point claro | ✅ `app.py` → `create_app()` | ✅ `src/app.js` → `createApp()` | ✅ `app.py` → `create_app()` |
+| Aplicação inicia sem erros | ✅ | ✅ | ✅ |
+| Endpoints originais respondem | ✅ 31/34 iguais + 3 de segurança | ✅ 10/13 iguais + 3 do `/admin` | ✅ 36/37 iguais + 1 bug corrigido |
+
+### Logs das execuções
+
+| Projeto | Fases 1+2 | Fase 3 | Smoke independente |
+|---|---|---|---|
+| P1 | [project-1-phase1-2.log](docs/logs/project-1-phase1-2.log) | [project-1-phase3.log](docs/logs/project-1-phase3.log) | [project-1-smoke.txt](docs/logs/project-1-smoke.txt) |
+| P2 | [project-2-phase1-2.log](docs/logs/project-2-phase1-2.log) | [project-2-phase3.log](docs/logs/project-2-phase3.log) | [project-2-smoke.txt](docs/logs/project-2-smoke.txt) |
+| P3 | [project-3-phase1-2.log](docs/logs/project-3-phase1-2.log) | [project-3-phase3.log](docs/logs/project-3-phase3.log) | [project-3-smoke.txt](docs/logs/project-3-smoke.txt) |
+
+Os logs foram extraídos do `--output-format stream-json` do Claude Code e mostram as mensagens do agente e um resumo de cada ferramenta usada.
+
+Trecho do boot do P1 refatorado:
+```
+SECRET_KEY não definida; usando chave aleatória efêmera para esta execução
+INFO:__main__:Servidor iniciado em http://localhost:5000
+ * Serving Flask app 'src.app'
+ * Debug mode: off
+```
+
+### Observações sobre o comportamento em stacks diferentes
+
+- **Mesma skill, sem nenhum ajuste por stack.** As 3 cópias são idênticas (`diff -r`). Todos os ajustes feitos durante as iterações foram genéricos, nunca específicos de um projeto.
+- **Monólito Python (P1).** Gerou o layout completo em `src/` e manteve `python app.py` através de um entry point fino.
+- **God Class Node (P2).**
+  - Escolheu uma camada `services/` para checkout e relatório, que são regras com transação.
+  - Promisificou o `sqlite3` e manteve os nomes públicos crípticos do payload (`usr`, `eml`, `c_id`), renomeando só internamente.
+  - Preservou o formato de erro em **texto puro** do original.
+- **Projeto parcial (P3).**
+  - Seguiu a estratégia "completar em vigor": manteve `routes/`, adicionou `controllers/` e `config/`, e respeitou o import `from app import app, db` do `seed.py`.
+  - Preservou o envelope `{"error": …}`, diferente do `{"erro": …}` do P1.
+  - Detectou dependências declaradas e nunca usadas (`marshmallow`, `requests`, `python-dotenv`).
+- **Formato JSON.** No P1 e no P3 o JSON deixou de sair indentado. Era efeito colateral de `debug=True`, e as chaves e valores são os mesmos.
+- **Lacunas registradas:**
+  - o P3 ficou sem `.env.example`;
+  - o P2 cita caminhos sem o prefixo `src/`;
+  - o P3 contou 14 arquivos em vez de 15.
+
+  Nenhuma afeta o funcionamento. São candidatas a uma próxima iteração das referências.
+- **Modelo.** As execuções headless rodaram com o modelo padrão do Claude Code no ambiente, registrado na primeira linha de cada log. Custo aproximado por projeto: US$ 1 nas Fases 1 e 2 e de US$ 2,3 a 6 na Fase 3.
 
 ---
 
 ## D) Como Executar
 
-_Em andamento._
+### Pré-requisitos
+- **Claude Code** instalado e autenticado (`claude --version`).
+- **Python 3.10+** com `venv` e `pip` (no Debian/Ubuntu: `sudo apt install python3-venv python3-pip`).
+- **Node.js 18+** e npm.
+- `git` e `curl`, para validar.
+
+### Preparar os ambientes
+```bash
+git clone https://github.com/pizolatoguilherme/mba-ia-refactor-projects-skill.git
+cd mba-ia-refactor-projects-skill
+
+(cd code-smells-project && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt)
+(cd task-manager-api   && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt)
+(cd ecommerce-api-legacy && npm install)
+```
+
+### Executar a skill (ordem sugerida: P1 → P2 → P3)
+A skill está em `.claude/skills/refactor-arch/` dentro de cada projeto. Os projetos deste repositório **já estão refatorados**. Para reproduzir a refatoração do zero, clone o [repositório base](https://github.com/devfullcycle/mba-ia-refactor-projects-skill) e copie a pasta `.claude/` de qualquer projeto deste repositório para dentro de cada projeto de lá.
+
+**Interativo** (pausa na Fase 2 e espera `y`):
+```bash
+cd code-smells-project   && claude "/refactor-arch"
+cd ../ecommerce-api-legacy && claude "/refactor-arch"
+cd ../task-manager-api     && claude "/refactor-arch"
+```
+
+**Headless** (como foi executado aqui):
+```bash
+cd code-smells-project
+claude -p "/refactor-arch" --permission-mode acceptEdits \
+  --allowedTools "Bash Read Write Edit Glob Grep" --add-dir .. \
+  --output-format stream-json --verbose > phase1-2.jsonl      # Fases 1+2, para em [y/n]
+claude -p "y" --resume <session_id> --permission-mode acceptEdits \
+  --allowedTools "Bash Read Write Edit Glob Grep" --add-dir .. \
+  --output-format stream-json --verbose > phase3.jsonl        # Fase 3
+```
+
+O `session_id` está no evento `init` do primeiro arquivo. Use `--resume <id>` em vez de `-c`, para não retomar a sessão errada.
+
+O relatório é salvo em `reports/audit-<pasta-do-projeto>.md`. Neste repositório ele foi renomeado para `reports/audit-project-N.md`.
+
+### Rodar e validar os projetos refatorados
+```bash
+# P1 — http://localhost:5000
+cd code-smells-project && ADMIN_TOKEN=troque-me .venv/bin/python app.py
+
+# P2 — http://localhost:3000
+cd ecommerce-api-legacy && ADMIN_TOKEN=troque-me npm start
+
+# P3 — http://localhost:5000 (rode o seed antes)
+cd task-manager-api && .venv/bin/python seed.py && .venv/bin/python app.py
+```
+
+Smoke tests (com o app no ar, em outro terminal):
+```bash
+bash docs/logs/smoke-p1.sh http://127.0.0.1:5000 /tmp/p1.txt && cat /tmp/p1.txt
+bash docs/logs/smoke-p2.sh http://127.0.0.1:3000 /tmp/p2.txt && cat /tmp/p2.txt
+bash docs/logs/smoke-p3.sh http://127.0.0.1:5000 /tmp/p3.txt && cat /tmp/p3.txt
+```
+
+Os scripts usam o token `smoke-token`. Para ver os 200 nas rotas `/admin`, suba os apps com `ADMIN_TOKEN=smoke-token`.
+
+Rotas protegidas exigem o header `X-Admin-Token: <ADMIN_TOKEN>`:
+- P1: `/admin/query` e `/admin/reset-db`;
+- P2: `/api/admin/financial-report`.
+
+Sem `ADMIN_TOKEN` definido, essas rotas respondem 403.
+
+Compare a saída com as seções "ANTES" e "DEPOIS" de `docs/logs/project-N-smoke.txt`.
+
+### Variáveis de ambiente
+| Projeto | Variáveis |
+|---|---|
+| P1 | `SECRET_KEY`, `FLASK_DEBUG`, `HOST`, `PORT`, `DB_PATH`, `ADMIN_TOKEN`, `CORS_ORIGINS` (ver `.env.example`) |
+| P2 | `PORT`, `DB_PATH`, `PAYMENT_GATEWAY_KEY`, `SMTP_USER`, `ADMIN_TOKEN`… (ver `.env.example`) |
+| P3 | `SECRET_KEY`, `DATABASE_URL`, `HOST`, `PORT`, `CORS_ORIGINS`, `SMTP_HOST/PORT/USER/PASSWORD` |
+
+Sem `SECRET_KEY`, os apps geram uma chave aleatória a cada boot e mostram um aviso.
