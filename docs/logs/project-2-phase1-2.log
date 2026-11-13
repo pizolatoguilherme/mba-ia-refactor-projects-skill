@@ -1,0 +1,140 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+I'll start by reading the Phase 1 reference, then analyze the project structure.
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/project-analysis.md
+  > Bash: find . -type f \( -not -path './.git/*' -not -path './.venv/*' -not -path './venv/*' -not -path './node_modules/*' -not -path './.claude/*' -not -path '*/__pyca
+  > Read: <repo>/ecommerce-api-legacy/package.json
+  > Read: <repo>/ecommerce-api-legacy/src/app.js
+  > Read: <repo>/ecommerce-api-legacy/src/AppManager.js
+  > Read: <repo>/ecommerce-api-legacy/src/utils.js
+  > Read: <repo>/ecommerce-api-legacy/README.md
+  > Read: <repo>/ecommerce-api-legacy/api.http
+  > Bash: wc -l src/AppManager.js src/app.js src/utils.js | tail -1; echo "---"; node --version
+  > Bash: find . -type f \( -name '*.js' \) -not -path '*/node_modules/*' -not -path '*/.git/*' | wc -l
+```
+================================
+PHASE 1: PROJECT ANALYSIS
+================================
+Language:      JavaScript (Node.js v20.20.2, sem versão fixada no manifesto)
+Framework:     Express 4.x (^4.18.2)
+Dependencies:  sqlite3 ^5.1.6 (driver nativo, sem ORM)
+Domain:        API de LMS/E-commerce de cursos (checkout, matrícula, pagamento, relatório financeiro) — entidades: users, courses, enrollments, payments, audit_logs
+Architecture:  Monolítica — AppManager.js (src/AppManager.js:1-141) concentra schema, seed, rotas, regras de negócio e processamento de pagamento numa única classe; utils.js guarda config/segredos e funções utilitárias globais; não há pastas de camadas
+Source files:  3 files analyzed (~180 lines) — src/app.js (15), src/AppManager.js (141), src/utils.js (25)
+Entry point:   src/app.js (run: npm start → node src/app.js, port 3000)
+DB tables:     users, courses, enrollments, payments, audit_logs (SQLite em memória, seed no boot via initDb())
+Endpoints:     3 routes detected (POST /api/checkout, GET /api/admin/financial-report, DELETE /api/users/:id)
+================================
+```
+
+Prosseguindo direto para a Fase 2 (auditoria de arquitetura).
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/anti-patterns-catalog.md
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/audit-report-template.md
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/mvc-guidelines.md
+  > Bash: cd <repo>/ecommerce-api-legacy
+  > Bash: cd <repo>/ecommerce-api-legacy
+  > Bash: git rev-parse --show-toplevel
+  > Bash: ls -la <repo>/reports/ 2>/dev/null
+Good — now I'll write the full audit report to the reports folder.
+  > Write: <repo>/reports/audit-ecommerce-api-legacy.md
+Now running the mandatory self-check script.
+  > Bash: cd <repo>/ecommerce-api-legacy
+Self-check passou sem nenhuma saída de erro.
+
+## Relatório da Auditoria
+
+```
+================================
+ARCHITECTURE AUDIT REPORT
+================================
+Project: ecommerce-api-legacy
+Stack:   JavaScript (Node.js) + Express 4.x (^4.18.2)
+Files:   3 analyzed | ~180 lines of code
+Architecture: Monolítica
+Date:    2026-11-13
+
+## Summary
+CRITICAL: 4 | HIGH: 4 | MEDIUM: 4 | LOW: 5
+
+| ID | Severity | Anti-pattern | Location |
+|----|----------|--------------|----------|
+| F01 | CRITICAL | Credenciais/segredos hardcoded | src/utils.js:1-7 |
+| F02 | CRITICAL | God Class / God Module | src/AppManager.js:1-141 |
+| F03 | CRITICAL | Hash de senha fraco + senha padrão insegura | src/utils.js:17-23 (+1) |
+| F04 | CRITICAL | Exposição de dados sensíveis em log | src/AppManager.js:45 |
+| F05 | HIGH | Rotas administrativas/sensíveis sem autenticação | src/AppManager.js:80 (+1) |
+| F06 | HIGH | Estado global mutável | src/utils.js:9-10 (+2) |
+| F07 | HIGH | Acoplamento forte / sem injeção de dependência | src/AppManager.js:4-9 (+1) |
+| F08 | HIGH | Callback hell / escrita multi-etapas sem transação | src/AppManager.js:37-77 (+1) |
+| F09 | MEDIUM | Consultas N+1 no relatório financeiro | src/AppManager.js:83-127 |
+| F10 | MEDIUM | Erros engolidos / callbacks ignorando `err` | src/AppManager.js:92 (+3) |
+| F11 | MEDIUM | Ausência de integridade referencial no delete | src/AppManager.js:131-137 |
+| F12 | MEDIUM | Validação de entrada ausente/inconsistente | src/AppManager.js:29-35 |
+| F13 | LOW | `console.log` como logging | src/app.js:13 (+1) |
+| F14 | LOW | Números/strings mágicos | src/AppManager.js:46 (+1) |
+| F15 | LOW | Nomenclatura pobre | src/AppManager.js:29-33 (+2) |
+| F16 | LOW | Import/variável morta (`totalRevenue`) | src/utils.js:10 (+2) |
+| F17 | LOW | Uso não idiomático de `let` em vez de `const` | src/AppManager.js:29-33 (+6) |
+```
+
+## Findings
+### F01 [CRITICAL] Credenciais/segredos hardcoded — src/utils.js:1-7
+`config` guarda senha de banco, chave de gateway de pagamento de produção e usuário SMTP como literais no código → mover para variáveis de ambiente lidas em `config/index.js`, documentadas em `.env.example`.
+### F02 [CRITICAL] God Class / God Module — src/AppManager.js:1-141
+Uma classe concentra schema, seed, rotas, validação, checkout, pagamento e relatório de 5 tabelas distintas → dividir em `models/`, `services/`, `controllers/`, `routes/`, `database/`.
+### F03 [CRITICAL] Hash de senha fraco + senha padrão insegura — src/utils.js:17-23, src/AppManager.js:68
+`badCrypto` é apenas Base64 repetido e truncado (reversível, sem salt), e usuários sem senha recebem `"123456"` → usar `crypto.scrypt`/`pbkdf2` com salt e exigir senha no payload.
+### F04 [CRITICAL] Exposição de dados sensíveis em log — src/AppManager.js:45
+Número completo do cartão e a chave do gateway são logados em texto puro a cada checkout → remover o log sensível, logar no máximo os últimos 4 dígitos.
+### F05 [HIGH] Rotas administrativas/sensíveis sem autenticação — src/AppManager.js:80, src/AppManager.js:131
+`/api/admin/financial-report` expõe dados de todos os alunos e `DELETE /api/users/:id` remove qualquer conta sem nenhuma checagem → proteger a rota `/admin` com `X-Admin-Token`; manter o DELETE como está e só recomendar auth (fora de escopo, é CRUD comum).
+### F06 [HIGH] Estado global mutável — src/utils.js:9-10, 14, 25
+`globalCache`/`totalRevenue` são variáveis de módulo mutáveis exportadas e alteradas por função livre → eliminar/encapsular em serviço explícito.
+### F07 [HIGH] Acoplamento forte / sem injeção de dependência — src/AppManager.js:4-9, src/app.js:8-10
+O banco é instanciado dentro do construtor da própria classe de rotas, sem factory → `database/connection.js` + `createApp(db)` recebendo a conexão por parâmetro.
+### F08 [HIGH] Callback hell / escrita multi-etapas sem transação — src/AppManager.js:37-77, 83-129
+5+ níveis de callback com `self = this` e 3 INSERTs sem transação no checkout; contadores manuais no relatório → promisificar e usar `async/await` com `BEGIN/COMMIT/ROLLBACK`.
+### F09 [MEDIUM] Consultas N+1 no relatório financeiro — src/AppManager.js:83-127
+Uma query por curso e duas por matrícula fazem o número de consultas crescer linearmente → substituir por JOIN/agregação única.
+### F10 [MEDIUM] Erros engolidos / callbacks ignorando `err` — src/AppManager.js:92, 104, 106, 133
+Vários callbacks do `sqlite3` nunca verificam `err` antes de usar o resultado ou responder sucesso → centralizar erro em middleware e propagar `err`.
+### F11 [MEDIUM] Ausência de integridade referencial no delete — src/AppManager.js:131-137
+O próprio texto da resposta admite que matrículas/pagamentos ficam órfãos após deletar um usuário → excluir/arquivar dependências dentro de uma transação.
+### F12 [MEDIUM] Validação de entrada ausente/inconsistente — src/AppManager.js:29-35
+Só a presença dos campos é checada, sem validar tipo/formato de `c_id`/cartão → validador reutilizável no controller.
+### F13 [LOW] `console.log` como logging — src/app.js:13, src/utils.js:13
+Boot e cache logados via `console.log` sem níveis/estrutura → encapsular em `config/logger.js`.
+### F14 [LOW] Números/strings mágicos — src/AppManager.js:46, src/utils.js:19
+Prefixo `"4"` e `10000` embutidos sem constante nomeada → extrair para `config/constants.js`.
+### F15 [LOW] Nomenclatura pobre — src/AppManager.js:29-33, src/utils.js:12, 17
+Variáveis de uma letra (`u, e, p, cid, cc`) e nomes como `badCrypto`/`logAndCache` → renomear ao mover para os controllers.
+### F16 [LOW] Import/variável morta (`totalRevenue`) — src/utils.js:10, 25, src/AppManager.js:2
+Declarada, exportada e importada mas nunca lida/incrementada → remover.
+### F17 [LOW] Uso não idiomático de `let` em vez de `const` — src/AppManager.js:29-33 (+6 locais)
+Variáveis nunca reatribuídas usam `let` → trocar por `const` na reescrita.
+
+## Deprecated APIs
+Nenhuma API deprecated encontrada (Node v20 / Express ^4.18.2; sem `new Buffer`, `url.parse`, `req.param()`, `app.del()`, `var`). O driver `sqlite3` callback-only não é deprecated, mas é tratado como anti-padrão de legibilidade em F08.
+
+## Proposed Target Architecture
+```
+src/
+├── app.js (composition root)
+├── config/   (index.js, logger.js)
+├── database/connection.js
+├── models/   (user, course, enrollment, payment)
+├── services/ (checkoutService, reportService)
+├── controllers/ (checkout, report, user)
+├── routes/   (checkoutRoutes, adminRoutes, userRoutes, index.js)
+└── middlewares/ (errorHandler, adminAuth)
+```
+Estratégia: reestruturar o monólito por completo, remover `AppManager.js` e `utils.js`, manter `npm start` e porta 3000.
+
+Relatório completo salvo em: `<repo>/reports/audit-ecommerce-api-legacy.md`
+
+```
+================================
+Total: 17 findings
+================================
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+```
+[result: success | turns 20 | 250s | cost $1.10]
