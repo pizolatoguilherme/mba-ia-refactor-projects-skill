@@ -179,9 +179,12 @@ PHASE 3: REFACTORING COMPLETE
   ✓|✗ Application boots without errors (<command>)
   ✓|✗ All <N> original endpoints respond as in the baseline (<N>/<N>)
   ✓|✗ Configuration read from environment (no hardcoded secrets)
-  ✓|✗ .env.example documents all <N> environment variables read by the config
+  ✓|✗ .env.example documents every environment variable read by the config (<VAR1, VAR2, …>)
   ✓|✗ Zero CRITICAL/HIGH anti-patterns remaining
 ================================
 ```
 
-Use ✗ honestly — never report a check as passed if you did not run it.
+Use ✗ honestly — never report a check as passed if you did not run it. Every number in this block
+(endpoints, requests, findings) must be copied from a command output you just ran, not recalled.
+Leave no runtime artifacts behind (`__pycache__/`, `*.db`, logs) — including ones created by your
+own import/boot checks.

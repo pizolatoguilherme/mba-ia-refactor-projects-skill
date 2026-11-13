@@ -206,9 +206,13 @@ the API is already removed in the installed version (will crash); LOW if purely 
 | Node | `url.parse()`, `querystring` | `new URL()`, `URLSearchParams` |
 | Node | `crypto.createCipher()` | `crypto.createCipheriv()` |
 | Node | `fs.exists()`, `util.isArray()` etc. | `fs.existsSync()`/`fs.promises.access`, `Array.isArray()` |
-| Node | callback-only DB/fs APIs with nested callbacks (`sqlite3` `db.run(sql, cb)`) | promise wrappers / `util.promisify` / `fs.promises` + `async/await` |
+| Node | `fs.*` callback forms used where `fs.promises` exists in the runtime | `fs.promises` + `async/await` |
 | Express 4→5 | `req.param()`, `res.send(status, body)`, `res.json(status, obj)`, `app.del()`, standalone `body-parser` | `req.params/query/body`, `res.status(s).send()`, `app.delete()`, `express.json()` |
 | JS | `var` declarations | `const` / `let` |
+
+Only list APIs that are **officially deprecated or removed** by their runtime/library. A callback
+style that the library still supports (e.g. the npm `sqlite3` driver) is a legacy *pattern*, not a
+deprecated API: report it under AP-12 (callback hell) with PB-10, not in this table.
 
 Grep helpers: `grep -rn "utcnow\|\.query\.get(\|before_first_request" --include=*.py .`,
 `grep -rn "new Buffer\|url.parse\|createCipher(\|req.param(" --include=*.js .`.
