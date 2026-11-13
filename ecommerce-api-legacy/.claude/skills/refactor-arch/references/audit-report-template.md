@@ -19,6 +19,35 @@ Fixed headers stay in English; descriptions, impacts and recommendations are in 
   file, use its full range (`app.py:1-88`).
 - The Summary table `Location` column shows the main `path:lines`; when there are more locations
   append `(+N)` — e.g. `models.py:28 (+18)`.
+- Comments inside `Evidence` code blocks that cite a location also use the full path
+  (`// src/AppManager.js:68`, `# routes/user_routes.py:61`).
+- Every `File:` line contains at least one `path:line` — never "ver tabela", "vários", etc. A
+  finding that groups deprecated APIs lists its main locations in `File:` and the full list in the
+  Deprecated APIs table.
+- A range never ends past the last line of the file (`awk 'END{print NR}' <file>` gives the count).
+
+## Mandatory self-check (run before printing the report)
+
+Run from the project root, with `REPORT` pointing to the saved file. Every command must print
+nothing; fix the report and re-run until they do.
+
+```bash
+REPORT=<path to the saved report>
+# 1. every path:line(-line) cited exists and is within the file length
+grep -oE '[A-Za-z0-9_./-]+\.(py|js|ts|jsx|tsx|rb|go|java|php|cs):[0-9]+(-[0-9]+)?' "$REPORT" | sort -u |
+while IFS=: read -r f l; do
+  if [ ! -f "$f" ]; then echo "MISSING PATH: $f (use the full path from the project root)"; continue; fi
+  n=$(awk 'END{print NR}' "$f"); end=${l#*-}
+  [ "$end" -le "$n" ] || echo "OUT OF RANGE: $f:$l (file has $n lines)"
+done
+# 2. every File: line has a line number
+grep '^File:' "$REPORT" | grep -vE ':[0-9]+' 
+# 3. summary counts and Total match the findings
+for s in CRITICAL HIGH MEDIUM LOW; do
+  c=$(grep -cE "^### F[0-9]+ \[$s\]" "$REPORT"); grep -qE "$s: $c( |$)" "$REPORT" || echo "COUNT MISMATCH: $s=$c"
+done
+t=$(grep -cE '^### F[0-9]+ ' "$REPORT"); grep -q "Total: $t findings" "$REPORT" || echo "TOTAL MISMATCH: $t"
+```
 - `Catalog:` holds the AP-ID(s) from `anti-patterns-catalog.md`; `Fix:` the playbook ID(s).
 - `Evidence:` holds a short excerpt (1–3 lines) of the offending code.
 - The summary counts must equal the number of findings listed.

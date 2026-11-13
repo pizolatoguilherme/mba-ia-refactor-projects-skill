@@ -92,19 +92,36 @@ Read `references/anti-patterns-catalog.md` and `references/audit-report-template
    only the folder names (business rules in routes, duplicated logic, unused helpers, etc.).
 6. Sort findings CRITICAL → HIGH → MEDIUM → LOW and number them (`F01`, `F02`, …).
    Write every location as the full path from the project root (`src/utils.js:12`, never
-   `utils.js:12`). Before saving, verify each distinct path you cite exists
-   (`test -f <path> || echo MISSING <path>`) and fix any that does not.
+   `utils.js:12`) — in the Summary, `File:`, tables **and comments inside Evidence blocks**.
 7. Fill the "Proposed Target Architecture" section using `references/mvc-guidelines.md` §2 (layout
    for this stack and maturity) and §5 (strategy), so Phase 3 executes what the report promised.
 8. Save the **full** report (template, every section) to
    `<git repository root>/reports/audit-<project-folder-name>.md` (create `reports/` if needed;
    if not in a git repo, use `./reports/`). This is the only file you may write before approval.
-9. Print the report in the conversation so the human can review it before approving: the header
-   block, the Summary (counts + table) and, **for every finding**, a condensed entry —
-   `### Fnn [SEVERITY] <name>`, `File: <exact locations>`, `Description:` and `Recommendation:`
-   (one line each) — followed by the Deprecated APIs table and the Proposed Target Architecture.
-   Do not skip findings and do not claim to have printed content you did not print; then give the
-   path of the saved full report.
+   Then run the **mandatory self-check** from `references/audit-report-template.md` and fix the
+   report until every check prints nothing. Mention in the conversation that the self-check passed.
+9. Print the report in the conversation so the human can review it before approving. Use exactly
+   this shape — the number of `### Fnn` entries printed **must equal** the Total:
+
+   ````
+   <header block + "## Summary" with counts and table>
+
+   ## Findings
+   ### F01 [SEVERITY] <name>
+   File: <exact locations>
+   Description: <one line>
+   Recommendation: <one line>
+
+   ### F02 [SEVERITY] <name>
+   ...   (one entry for EVERY finding, F01 to Fnn — a summary table alone is not enough)
+
+   ## Deprecated APIs
+   <table or "Nenhuma API deprecated encontrada">
+
+   ## Proposed Target Architecture
+   <tree + strategy>
+   ````
+   Then give the path of the saved full report. Never claim to have printed content you did not print.
 10. End with exactly:
 
 ```
