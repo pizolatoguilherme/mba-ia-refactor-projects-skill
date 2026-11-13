@@ -158,9 +158,9 @@ Cada item traz **sinais de detecção concretos** (por exemplo, `cursor.execute(
 
 ### Desafios encontrados
 
-No total foram **17 execuções completas das Fases 1+2** (7 no P1, 5 no P2, 5 no P3) e **9 da Fase 3**, divididas em uma fase inicial de ajuste e 4 rodadas de correção. Todas as tentativas descartadas, com relatórios e logs, estão em [docs/logs/iterations/](docs/logs/iterations/) (`iterN` = ajuste inicial, `runN` = rodada N).
+No total foram **17 execuções completas das Fases 1+2** (7 no P1, 5 no P2, 5 no P3) e **9 da Fase 3**, divididas em uma fase inicial de ajuste e 4 rodadas de correção. O repositório guarda só os artefatos da rodada final; as tentativas descartadas foram usadas apenas como diagnóstico.
 
-Para não depender só de leitura humana, escrevi um verificador independente, [docs/logs/check-report.py](docs/logs/check-report.py). Ele confere:
+Para não depender só de leitura humana, usei um verificador independente (script local, fora da entrega). Ele confere:
 - se cada `caminho:linha` citado existe e está dentro do tamanho do arquivo;
 - se a ordenação e os totais estão consistentes;
 - se a contagem de arquivos bate com o `find` real.
@@ -182,7 +182,7 @@ Cada rodada só avançou quando o verificador não acusou nada.
 | 11 | Rodada 4: as execuções do P2 e do P3 pararam no meio por limite de uso da conta | Limite da sessão Claude | Execuções incompletas descartadas e refeitas depois que o limite renovou |
 | 12 | Rodada 4: os resumos da Fase 3 do P1 e do P3 escreveram "6" e "9" variáveis, quando eram 7 e 10 (o código estava correto) | Número escrito de memória | A linha passa a listar os **nomes** das variáveis, todo número do bloco de validação deve vir de um comando executado e nenhum artefato de runtime pode sobrar. P1 e P3 foram refeitos com essa versão |
 | 13 | O `sqlite3` com callbacks às vezes aparecia como API deprecated e às vezes não | O catálogo listava o padrão em AP-12 e em AP-18 ao mesmo tempo | AP-18 passa a valer só para APIs oficialmente deprecated. Callbacks ainda suportados ficam em AP-12 |
-| 14 | Na rodada final, minha varredura de código morto ([deadcode.py](docs/logs/deadcode.py)) achou `format_date` em `task-manager-api/utils/helpers.py` sem nenhum uso. O resumo da Fase 3 afirmava ter removido as funções mortas | A autoverificação da Fase 3 confere config, segredos e APIs deprecated, mas não varre código morto | **Ajuste manual** depois da skill: função removida e smoke do P3 repetido (37/37 iguais à validação). É o único trecho do código refatorado que não saiu da skill. Fica como melhoria futura incluir a varredura de código morto no `validation-guide.md` |
+| 14 | Na rodada final, minha varredura de código morto (script local, fora da entrega) achou `format_date` em `task-manager-api/utils/helpers.py` sem nenhum uso. O resumo da Fase 3 afirmava ter removido as funções mortas | A autoverificação da Fase 3 confere config, segredos e APIs deprecated, mas não varre código morto | **Ajuste manual** depois da skill: função removida e smoke do P3 repetido (37/37 iguais à validação). É o único trecho do código refatorado que não saiu da skill. Fica como melhoria futura incluir a varredura de código morto no `validation-guide.md` |
 
 Também registrei o que a skill **decidiu não fazer**:
 - implementar autenticação real (JWT/sessão), que exige decisões de produto;
@@ -212,7 +212,7 @@ As 3 cópias versionadas da skill são idênticas (`diff -r`) e correspondem ao 
 | ecommerce-api-legacy | Node.js 20 + Express 4.x | Monolítica | 4 | 4 | 4 | 5 | **17** | [audit-project-2.md](reports/audit-project-2.md) |
 | task-manager-api | Python + Flask 3.0.0 + Flask-SQLAlchemy | Camadas parciais | 3 | 4 | 7 | 4 | **18** | [audit-project-3.md](reports/audit-project-3.md) |
 
-Verificação automática dos 3 relatórios com [check-report.py](docs/logs/check-report.py) e com a autoverificação da própria skill:
+Verificação automática dos 3 relatórios com o meu verificador independente e com a autoverificação da própria skill:
 - **zero** caminhos inexistentes ou linhas fora do arquivo (111, 37 e 97 referências conferidas);
 - contagem de arquivos igual à real (4, 3 e 15);
 - ordenação e totais consistentes;
