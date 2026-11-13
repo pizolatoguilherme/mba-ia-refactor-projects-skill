@@ -108,6 +108,11 @@ Resolve prefixes (`url_prefix`, `app.use('/api', router)`). Also read request co
 | **Camadas parciais** | Folders such as `models/`, `routes/`, `services/`, `utils/` exist, but responsibilities leak: business rules/validation inside route handlers, unused service/helper layers, config hardcoded in the entry point, no centralized error handling, no controllers |
 | **Em camadas** | Routes only delegate; controllers orchestrate; models/repositories own data access; config from environment; centralized error handling. Audit still runs — focus on code-level smells |
 
+**File names are not layers.** A project whose layers are *single files* (`models.py`,
+`controllers.py`, `utils.js`) each holding every domain, with SQL/rules/HTTP mixed, is
+**Monolítica** — even though the file names look like MVC. "Camadas parciais" requires layer
+*packages/folders* split by resource (e.g. `models/task.py`, `routes/user_routes.py`).
+
 Write a one-line justification citing the concrete evidence (e.g.
 "Monolítica — `AppManager.js` concentra schema, seed, rotas e pagamento").
 

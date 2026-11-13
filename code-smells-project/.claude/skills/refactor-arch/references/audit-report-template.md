@@ -1,7 +1,7 @@
 # Audit Report Template (Phase 2)
 
-The report is printed in the conversation **and** saved to
-`<git root>/reports/audit-<project-folder>.md` with identical content.
+The full report is saved to `<git root>/reports/audit-<project-folder>.md`; the conversation
+shows the condensed version described in `SKILL.md` (Phase 2, step 9).
 Fixed headers stay in English; descriptions, impacts and recommendations are in Portuguese.
 
 ## Rules
@@ -11,6 +11,11 @@ Fixed headers stay in English; descriptions, impacts and recommendations are in 
 - `File:` always holds exact `path:line` or `path:start-end`, relative to the project root.
   Multiple locations are comma-separated or listed one per line. Lines must match the current
   file content (verify with `grep -n` / `sed -n 'X,Yp'`).
+- **Never** write a bare filename or vague text ("controllers.py", "múltiplas funções", "todas as
+  rotas") as a location — not in `File:` and not in the Summary table. If a finding spans a whole
+  file, use its full range (`app.py:1-88`).
+- The Summary table `Location` column shows the main `path:lines`; when there are more locations
+  append `(+N)` — e.g. `models.py:28 (+18)`.
 - `Catalog:` holds the AP-ID(s) from `anti-patterns-catalog.md`; `Fix:` the playbook ID(s).
 - `Evidence:` holds a short excerpt (1–3 lines) of the offending code.
 - The summary counts must equal the number of findings listed.

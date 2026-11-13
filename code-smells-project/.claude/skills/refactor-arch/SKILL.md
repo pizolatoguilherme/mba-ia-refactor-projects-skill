@@ -91,10 +91,18 @@ Read `references/anti-patterns-catalog.md` and `references/audit-report-template
 5. Partially organized projects still have findings: inspect the *content* of each layer, not
    only the folder names (business rules in routes, duplicated logic, unused helpers, etc.).
 6. Sort findings CRITICAL → HIGH → MEDIUM → LOW and number them (`F01`, `F02`, …).
-7. Print the full report following the template, and save the same content to
+7. Fill the "Proposed Target Architecture" section using `references/mvc-guidelines.md` §2 (layout
+   for this stack and maturity) and §5 (strategy), so Phase 3 executes what the report promised.
+8. Save the **full** report (template, every section) to
    `<git repository root>/reports/audit-<project-folder-name>.md` (create `reports/` if needed;
    if not in a git repo, use `./reports/`). This is the only file you may write before approval.
-8. End with exactly:
+9. Print the report in the conversation so the human can review it before approving: the header
+   block, the Summary (counts + table) and, **for every finding**, a condensed entry —
+   `### Fnn [SEVERITY] <name>`, `File: <exact locations>`, `Description:` and `Recommendation:`
+   (one line each) — followed by the Deprecated APIs table and the Proposed Target Architecture.
+   Do not skip findings and do not claim to have printed content you did not print; then give the
+   path of the saved full report.
+10. End with exactly:
 
 ```
 ================================
