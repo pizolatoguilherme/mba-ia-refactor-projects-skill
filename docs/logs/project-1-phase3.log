@@ -1,0 +1,196 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/refactoring-playbook.md
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/validation-guide.md
+  > ToolSearch: 
+  > TodoWrite: 
+  > Bash: ls -la .venv/bin/python* 2>/dev/null && .venv/bin/python -c "import flask, flask_cors; print('flask', flask.__version__); print('flask_cors ok')"
+Venv already has Flask 3.1.1 and flask-cors installed. Now let's set up the work directory and write the baseline smoke script.
+  > Bash: mkdir -p /tmp/refactor-arch-code-smells-project
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+Now let's boot the original app and run the baseline.
+  > Bash: cd <repo>/code-smells-project
+  > Bash: cd <repo>/code-smells-project
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+Baseline captured — all 30 requests succeeded as expected from the original. Now let's stop the server and check the log.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+Baseline clean, no errors in log, 30/30 requests behaved as expected. Clean up `__pycache__` and move to building the MVC structure.
+  > Bash: rm -rf __pycache__
+  > TodoWrite: 
+Planned target structure (Monolítica → full restructure, per `mvc-guidelines.md` §2.1):
+
+```
+code-smells-project/
+├── app.py                      # thin entry point
+├── requirements.txt
+├── .env.example
+├── README.md
+└── src/
+    ├── __init__.py
+    ├── app.py                  # create_app()
+    ├── config/
+    │   ├── __init__.py
+    │   └── settings.py
+    ├── database.py
+    ├── models/
+    │   ├── __init__.py
+    │   ├── produto_model.py
+    │   ├── usuario_model.py
+    │   └── pedido_model.py
+    ├── validators/
+    │   ├── __init__.py
+    │   ├── produto_validator.py
+    │   ├── usuario_validator.py
+    │   └── pedido_validator.py
+    ├── services/
+    │   ├── __init__.py
+    │   ├── notification_service.py
+    │   └── relatorio_service.py
+    ├── controllers/
+    │   ├── __init__.py
+    │   ├── produto_controller.py
+    │   ├── usuario_controller.py
+    │   ├── pedido_controller.py
+    │   ├── relatorio_controller.py
+    │   ├── health_controller.py
+    │   └── admin_controller.py
+    ├── views/
+    │   ├── __init__.py
+    │   ├── produto_routes.py
+    │   ├── usuario_routes.py
+    │   ├── pedido_routes.py
+    │   ├── relatorio_routes.py
+    │   ├── health_routes.py
+    │   └── admin_routes.py
+    └── middlewares/
+        ├── __init__.py
+        ├── error_handler.py
+        └── auth.py
+```
+
+Let's start building it, beginning with config and the error-handling foundation.
+  > Bash: cd <repo>/code-smells-project
+Now `src/config/settings.py` (fixes F01/F10):
+  > Write: <repo>/code-smells-project/src/config/settings.py
+Now the error-handling middleware (fixes F15/AP-16, keeps the original `{"erro": ...}` envelope):
+  > Write: <repo>/code-smells-project/src/middlewares/error_handler.py
+Now the admin auth guard (fixes F03):
+  > Write: <repo>/code-smells-project/src/middlewares/auth.py
+Now `src/database.py` (fixes F08, per-request connection via `flask.g`):
+  > Write: <repo>/code-smells-project/src/database.py
+  > Write: <repo>/code-smells-project/src/models/produto_model.py
+  > Write: <repo>/code-smells-project/src/models/usuario_model.py
+  > Write: <repo>/code-smells-project/src/models/pedido_model.py
+Now `services/relatorio_service.py` (fixes magic numbers in F17) and `services/notification_service.py` (fixes F07):
+  > Write: <repo>/code-smells-project/src/services/relatorio_service.py
+  > Write: <repo>/code-smells-project/src/services/notification_service.py
+  > Write: <repo>/code-smells-project/src/validators/produto_validator.py
+  > Write: <repo>/code-smells-project/src/validators/usuario_validator.py
+  > Write: <repo>/code-smells-project/src/validators/pedido_validator.py
+  > Write: <repo>/code-smells-project/src/controllers/produto_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/usuario_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/pedido_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/relatorio_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/health_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/admin_controller.py
+Now the views (Blueprints):
+  > Write: <repo>/code-smells-project/src/views/produto_routes.py
+  > Write: <repo>/code-smells-project/src/views/usuario_routes.py
+  > Write: <repo>/code-smells-project/src/views/pedido_routes.py
+  > Write: <repo>/code-smells-project/src/views/relatorio_routes.py
+  > Write: <repo>/code-smells-project/src/views/health_routes.py
+  > Write: <repo>/code-smells-project/src/views/admin_routes.py
+  > Write: <repo>/code-smells-project/src/controllers/home_controller.py
+  > Write: <repo>/code-smells-project/src/views/home_routes.py
+Now the composition root `src/app.py`:
+  > Write: <repo>/code-smells-project/src/app.py
+Now the thin root `app.py`, removing the old monolithic files:
+  > Read: <repo>/code-smells-project/app.py
+  > Write: <repo>/code-smells-project/app.py
+Now remove the old monolithic files and create `.env.example`:
+  > Bash: cd <repo>/code-smells-project
+  > Write: <repo>/code-smells-project/.env.example
+  > TodoWrite: 
+Structure complete. Now let's validate — boot the refactored app and check for import errors first.
+  > Bash: cd <repo>/code-smells-project
+Imports cleanly, 19 routes + implicit `/static` = 20. Now let's boot it for real and run the smoke test.
+  > Bash: cd <repo>/code-smells-project
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+Now let's compare status codes against the baseline.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+All 28 non-admin endpoint calls match the baseline exactly; the two admin endpoints correctly return 200 with the valid token (matching baseline behavior) and 403 without it (the approved F03 fix). Let's check the server log for errors.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+No tracebacks, notifications logged via `logging` instead of `print`. Let's verify `senha` is no longer exposed and spot-check a pedido body for N+1 correctness.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+Now the mandatory re-scan for remaining anti-patterns and `.env.example` completeness check.
+  > Bash: cd <repo>/code-smells-project
+  > Bash: cd <repo>/code-smells-project
+All checks pass — no real injection/secrets/deprecated-API/print hits remain, and `.env.example` documents every variable (including `FLASK_DEBUG`, read through the `_bool()` helper). Let's do one final sanity boot without any env overrides to confirm the default dev experience.
+  > Bash: cd <repo>/code-smells-project
+Boots cleanly, DB wiped artifacts removed, no `__pycache__` left behind. Let's do a final listing of the new structure and update the todo list.
+  > Bash: cd <repo>/code-smells-project
+  > TodoWrite: 
+```
+================================
+PHASE 3: REFACTORING COMPLETE
+================================
+## New Project Structure
+code-smells-project/
+├── app.py                      # entry point fino: from src.app import create_app
+├── requirements.txt
+├── .env.example
+├── README.md
+└── src/
+    ├── app.py                  # create_app(): composition root
+    ├── config/settings.py      # env vars + constantes (categorias, faixas de desconto, status)
+    ├── database.py             # get_db() por requisição (flask.g), init_schema(), seed_if_empty()
+    ├── models/                 # produto_model.py, usuario_model.py, pedido_model.py
+    ├── controllers/            # produto, usuario, pedido, relatorio, health, admin, home_controller.py
+    ├── views/                  # produto/usuario/pedido/relatorio/health/admin/home_routes.py (Blueprints)
+    ├── services/               # notification_service.py, relatorio_service.py
+    ├── validators/             # produto/usuario/pedido_validator.py
+    └── middlewares/            # error_handler.py (AppError + handlers), auth.py (require_admin)
+
+## Findings Resolution
+F01 Credenciais hardcoded — resolved (SECRET_KEY via env, chave efêmera gerada se ausente; removida do /health)
+F02 SQL Injection — resolved (todas as queries parametrizadas com `?` nos novos models)
+F03 Admin sem auth executando SQL arbitrário/destrutivo — resolved (`/admin/*` protegidas por `require_admin` + `X-Admin-Token`)
+F04 Senhas em texto puro — resolved (`generate_password_hash`/`check_password_hash` no model, validator e seed)
+F05 Exposição de dados sensíveis — resolved (`senha` removida da serialização; `/health` sem secret_key/debug/db_path)
+F06 God Module — resolved (split em models/produto_, usuario_, pedido_model.py; regras movidas para services/)
+F07 Fat controller — resolved (validação em validators/, notificações em services/notification_service.py)
+F08 Conexão global mutável — resolved (`flask.g` por requisição, fechada em teardown_appcontext)
+F09 Acoplamento forte / sem factory — resolved (`create_app()` composition root, imports concretos isolados)
+F10 Defaults de runtime inseguros — resolved (`DEBUG` via env, default `False`; `/health` reflete valor real)
+F11 Escrita multi-etapas sem transação — resolved (`with db:` em `pedido_model.create`)
+F12 Consultas N+1 — resolved (JOIN único em `pedido_model._fetch_pedidos`; produto reaproveitado em `create`)
+F13 Lógica duplicada — resolved (serialização centralizada em `_to_dict`; validação única em `produto_validator`)
+F14 Validação inconsistente — resolved (`atualizar_produto` usa o mesmo validator completo de `criar_produto`; itens de pedido validados antes do uso)
+F15 Exceções genéricas vazando detalhes — resolved (`middlewares/error_handler.py` centralizado, mensagem genérica para erros não mapeados)
+F16 Integridade referencial ausente — resolved (produto referenciado em pedidos é desativado em vez de apagado; listagens continuam íntegras)
+F17 Números/strings mágicos — resolved (constantes em `config/settings.py`)
+F18 Import não utilizado — resolved (`models.py` antigo removido por completo, junto com o `import sqlite3` morto)
+F19 `print` como logging — resolved (`logging` configurado no composition root)
+F20 Parâmetro `id` sombreando builtin — resolved (mantido apenas onde é parâmetro de rota Flask; demais remapeados para nomes de domínio nos models)
+
+## Contract Changes
+- `/admin/reset-db` e `/admin/query` agora exigem o header `X-Admin-Token` (= `ADMIN_TOKEN` do ambiente); sem o header ou sem `ADMIN_TOKEN` configurado, respondem 403 em vez de executar a operação. Com o header correto, comportamento idêntico ao original.
+- Respostas de usuário (`GET /usuarios`, `GET /usuarios/:id`, `POST /login`) não incluem mais o campo `senha`.
+- `GET /health` não retorna mais `secret_key`, `debug` nem `db_path`; o campo `ambiente` agora reflete o valor real de `DEBUG` em vez de estar fixo em `"producao"`.
+- `DELETE /produtos/:id` passa a fazer exclusão lógica (`ativo = 0`) quando o produto está referenciado em algum pedido, em vez de apagar a linha e deixar `itens_pedido` órfão; para produtos sem pedidos associados, comportamento idêntico ao original (delete físico, confirmado no smoke test).
+- `PUT /produtos/:id` agora valida tamanho do nome (2–200) e categoria válida, igual ao `POST /produtos` (antes só o create validava isso) — corrige F14.
+- Corpo vazio/inválido em `/login` e `/pedidos/:id/status` agora retorna 400 em vez de 500 (crash→4xx, mudança permitida pela política de contrato).
+- Respostas de erro passam a incluir sempre a chave `sucesso: false` junto de `erro` (antes isso era inconsistente entre rotas — parte da correção de F15).
+- Demais rotas, métodos, status codes de sucesso, envelopes (`dados`/`sucesso`/`erro`) e nomes de campos permanecem inalterados.
+
+## Validation
+  ✓ Application boots without errors (`python app.py`, confirmado também via `from app import app`)
+  ✓ All 19 original endpoints respond as in the baseline (28/28 chamadas não-admin idênticas ao baseline; as 2 chamadas admin com `X-Admin-Token` reproduzem o status 200 do baseline, e as 2 sem header retornam 403 conforme a mudança de contrato documentada)
+  ✓ Configuration read from environment (no hardcoded secrets) — confirmado por grep em `src/` e `app.py`
+  ✓ .env.example documents every environment variable read by the config (SECRET_KEY, FLASK_DEBUG, HOST, PORT, DB_PATH, ADMIN_TOKEN, CORS_ORIGINS)
+  ✓ Zero CRITICAL/HIGH anti-patterns remaining (re-grep de SQL concatenada, segredos hardcoded, APIs deprecated, `print`/`except:` nulo — sem ocorrências reais; os 2 hits de SQL do grep são f-strings com a constante `COLUMNS` fixa no servidor, não dados do request; os hits de "print(" são falsos positivos em "Blueprint(")
+================================
+```
+
+Resumo: todos os 20 findings da auditoria foram resolvidos, o app sobe com `python app.py` na porta 5000 como antes, e as 19 rotas originais respondem igual ao baseline — exceto as mudanças de contrato documentadas acima (todas de segurança/robustez, já previstas no relatório aprovado). Repositório sem artefatos de runtime (`loja.db`, `__pycache__`) e sem os arquivos monolíticos antigos (`controllers.py`, `database.py`, `models.py`).
+[result: success | turns 59 | 403s | cost $5.44]
