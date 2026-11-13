@@ -1,0 +1,157 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+I'll start Phase 1 — reading the analysis guidelines and then examining the project source.
+  > Read: <repo>/task-manager-api/.claude/skills/refactor-arch/references/project-analysis.md
+  > Bash: find . -path ./node_modules -prune -o -path ./.git -prune -o -path ./.claude -prune -o -type f -print | sort
+There's a `.venv` directory I need to exclude. Let me redo the inventory properly.
+  > Bash: find . -type f \
+  > Read: <repo>/task-manager-api/requirements.txt
+  > Read: <repo>/task-manager-api/README.md
+  > Read: <repo>/task-manager-api/app.py
+  > Read: <repo>/task-manager-api/database.py
+  > Read: <repo>/task-manager-api/models/__init__.py
+  > Read: <repo>/task-manager-api/models/category.py
+  > Read: <repo>/task-manager-api/models/task.py
+  > Read: <repo>/task-manager-api/models/user.py
+  > Read: <repo>/task-manager-api/routes/__init__.py
+  > Read: <repo>/task-manager-api/routes/task_routes.py
+  > Read: <repo>/task-manager-api/routes/user_routes.py
+  > Read: <repo>/task-manager-api/routes/report_routes.py
+Now the remaining files: services, utils, seed.py.
+  > Read: <repo>/task-manager-api/services/__init__.py
+  > Read: <repo>/task-manager-api/services/notification_service.py
+  > Read: <repo>/task-manager-api/utils/__init__.py
+  > Read: <repo>/task-manager-api/utils/helpers.py
+  > Read: <repo>/task-manager-api/seed.py
+  > Bash: wc -l app.py database.py models/__init__.py models/category.py models/task.py models/user.py routes/__init__.py routes/task_routes.py routes/user_routes.py rout
+  > Bash: grep -rn "\.route(" app.py routes/*.py | wc -l
+Confirmed: 22 endpoints. Now printing Phase 1 block.
+  > Bash: find . -type f \( -name '*.py' \) -not -path '*/.venv/*' -not -path '*/venv/*' | wc -l
+```
+================================
+PHASE 1: PROJECT ANALYSIS
+================================
+Language:      Python 3.14 (runtime local detectado; requirements.txt não fixa versão de Python)
+Framework:     Flask 3.0.0 (Blueprints, `@bp.route`)
+Dependencies:  Flask-SQLAlchemy 3.1.1 (ORM/SQLite), Flask-Cors 4.0.0, marshmallow 3.20.1 (importada mas não usada), requests 2.31.0 (não usada no código), python-dotenv 1.0.0 (importado mas .env nunca é carregado)
+Domain:        API de gerenciamento de tarefas (usuários, categorias, tasks, relatórios de produtividade)
+Architecture:  Camadas parciais — existem pastas `models/`, `routes/`, `services/`, `utils/`, mas regras de negócio, validação e serialização estão duplicadas dentro das rotas (ex.: cálculo de `overdue` repetido em `task_routes.py:30-39`, `routes/task_routes.py:71-78` e `routes/user_routes.py:171-180`), `services/notification_service.py` não é chamado por nenhuma rota, e `utils/helpers.py` tem funções (`process_task_data`, `validate_email`, `sanitize_string`, etc.) que nenhuma rota usa.
+Source files:  15 files analyzed (~1158 lines; `models/__init__.py`, `routes/__init__.py`, `services/__init__.py`, `utils/__init__.py` são barrels quase vazios)
+Entry point:   app.py (run: `python app.py`, port 5000)
+DB tables:     users, categories, tasks (SQLite, arquivo `tasks.db`, schema criado via `db.create_all()` em app.py:31)
+Endpoints:     22 rotas detectadas (7 em task_routes, 7 em user_routes, 6 em report_routes, 2 em app.py)
+================================
+```
+
+Proceeding to Phase 2 — reading the anti-pattern catalog and report template now.
+  > Read: <repo>/task-manager-api/.claude/skills/refactor-arch/references/anti-patterns-catalog.md
+  > Read: <repo>/task-manager-api/.claude/skills/refactor-arch/references/audit-report-template.md
+Let me verify several findings with targeted greps before writing the report.
+  > Bash: cd <repo>/task-manager-api
+  > Bash: cd <repo>/task-manager-api
+  > Bash: cd <repo>/task-manager-api
+  > Bash: cd <repo>/task-manager-api
+  > Bash: cd <repo>/task-manager-api
+  > Bash: cd <repo>/task-manager-api
+All line numbers confirmed. Now I'll write the full audit report to the reports directory.
+  > Bash: mkdir -p <repo>/reports
+  > Write: <repo>/reports/audit-task-manager-api.md
+Now running the mandatory self-check from the template.
+  > Bash: cd <repo>/task-manager-api
+  > Bash: cd <repo>
+Found the bare filenames in description text. Fixing both.
+  > Edit: <repo>/reports/audit-task-manager-api.md
+  > Edit: <repo>/reports/audit-task-manager-api.md
+Re-running the self-check to confirm it's clean now.
+  > Bash: cd <repo>/task-manager-api
+Self-check passed with no output. Here is the Phase 2 report:
+
+```
+================================
+ARCHITECTURE AUDIT REPORT
+================================
+Project: task-manager-api
+Stack:   Python 3.14 + Flask 3.0.0 (Flask-SQLAlchemy 3.1.1, SQLite)
+Files:   15 analyzed | ~1158 lines of code
+Architecture: Camadas parciais — pastas models/, routes/, services/, utils/ existem, mas regras de negócio e serialização estão duplicadas dentro das rotas, services/notification_service.py não é usado por nenhuma rota e utils/helpers.py tem funções/constantes mortas.
+Date:    2026-11-13
+
+## Summary
+CRITICAL: 3 | HIGH: 4 | MEDIUM: 7 | LOW: 4
+
+| ID | Severity | Anti-pattern | Location |
+|----|----------|--------------|----------|
+| F01 | CRITICAL | Credenciais hardcoded | app.py:13 (+2) |
+| F02 | CRITICAL | Hash de senha fraco (MD5) | models/user.py:29 (+1) |
+| F03 | CRITICAL | Exposição de dados sensíveis | models/user.py:21 (+3) |
+| F04 | HIGH | Lógica de negócio nas rotas (fat controller) | routes/task_routes.py:16-59 (+3) |
+| F05 | HIGH | Efeitos colaterais no import / acoplamento forte | app.py:30-31 (+1) |
+| F06 | HIGH | Defaults inseguros de runtime | app.py:34 (+1) |
+| F07 | HIGH | Autenticação/autorização quebrada | routes/user_routes.py:52 (+3) |
+| F08 | MEDIUM | Consultas N+1 e agregados repetidos | routes/task_routes.py:41-56 (+2) |
+| F09 | MEDIUM | Lógica duplicada (overdue, serialização) | routes/task_routes.py:30-39 (+5) |
+| F10 | MEDIUM | Validação de entrada ausente/inconsistente | routes/report_routes.py:196-202 (+1) |
+| F11 | MEDIUM | Exceções engolidas (except: genérico) | routes/task_routes.py:62 (+8) |
+| F12 | MEDIUM | Integridade referencial ausente no delete | routes/report_routes.py:211-223 |
+| F13 | MEDIUM | APIs deprecated (utcnow, Query.get) | models/task.py:15 (ver tabela) |
+| F14 | MEDIUM | Responsabilidade mal posicionada / camada morta | routes/report_routes.py:157-223 (+2) |
+| F15 | LOW | Magic numbers/strings | routes/task_routes.py:110 (+4) |
+| F16 | LOW | Imports não usados / código morto | routes/task_routes.py:7 (+4) |
+| F17 | LOW | print como logging | routes/task_routes.py:149 (+8) |
+| F18 | LOW | Construções não idiomáticas | routes/task_routes.py:141 (+4) |
+```
+
+## Findings
+
+### F01 [CRITICAL] Credenciais hardcoded — app.py:13, services/notification_service.py:7-10
+SECRET_KEY e credenciais SMTP escritas em texto plano no código → ler de variáveis de ambiente, documentadas em `.env.example`.
+### F02 [CRITICAL] Hash de senha fraco (MD5) — models/user.py:29,32
+Senhas hasheadas com MD5 sem salt, quebrável por brute-force → trocar por `werkzeug.security.generate_password_hash`/`check_password_hash`.
+### F03 [CRITICAL] Exposição de dados sensíveis — models/user.py:21, routes/user_routes.py:86,129,209
+`User.to_dict()` inclui o hash da senha e é devolvido em criação/atualização/login → remover `password` da serialização.
+### F04 [HIGH] Lógica de negócio nas rotas (fat controller) — routes/task_routes.py:16-59,273-299, user_routes.py:160-183, report_routes.py:12-165
+Overdue, serialização e agregações de relatório implementados inline nas rotas em vez de nos models/services → mover para `Task.to_dict()`/`is_overdue()` e um `report_service.py`.
+### F05 [HIGH] Efeitos colaterais no import / acoplamento forte — app.py:30-31, seed.py:2
+`db.create_all()` roda ao importar `app.py`, sem app factory → extrair `create_app()`.
+### F06 [HIGH] Defaults inseguros de runtime — app.py:15,34
+`debug=True` em `0.0.0.0` e `CORS(app)` irrestrito → ler `DEBUG`/`CORS_ORIGINS` do ambiente.
+### F07 [HIGH] Autenticação/autorização quebrada — routes/user_routes.py:52,71-72,185-211
+Cliente escolhe a própria role (pode virar admin); login retorna token falso + senha hasheada → bloquear role no cadastro público e emitir JWT real.
+### F08 [MEDIUM] Consultas N+1 e agregados repetidos — routes/task_routes.py:41-56, user_routes.py:22, report_routes.py:19-28,53-68
+Query por item dentro de loops e múltiplos `COUNT` separados → usar `join`/`selectinload` e `GROUP BY`.
+### F09 [MEDIUM] Lógica duplicada (overdue, serialização) — task_routes.py:30-39,71-80,283-287, user_routes.py:171-180, report_routes.py:34-37,132-135
+Regra de "atrasado" recalculada manualmente em 6 lugares em vez de usar `Task.is_overdue()` → centralizar no model.
+### F10 [MEDIUM] Validação de entrada ausente/inconsistente — report_routes.py:196-202, task_routes.py:113,182
+`update_category` não checa `data is None`; comparação de prioridade sem checar tipo → replicar validação `if not data` e `isinstance`.
+### F11 [MEDIUM] Exceções engolidas (except: genérico) — 12 ocorrências em task_routes.py, user_routes.py, report_routes.py, utils/helpers.py
+`except:` genérico esconde a causa real do erro → centralizar em `@app.errorhandler(Exception)`.
+### F12 [MEDIUM] Integridade referencial ausente no delete — report_routes.py:211-223
+Delete de categoria não desvincula tasks associadas (diferente do delete de usuário) → zerar `category_id` das tasks antes de excluir.
+### F13 [MEDIUM] APIs deprecated — ver tabela
+`datetime.utcnow()` e `Model.query.get()` usados em todo o código → `datetime.now(timezone.utc)` e `db.session.get()`.
+### F14 [MEDIUM] Responsabilidade mal posicionada / camada morta — report_routes.py:157-223, notification_service.py, utils/helpers.py:19-116
+CRUD de categorias dentro de `report_routes`; `NotificationService` e várias funções/constantes de `helpers.py` nunca usadas → mover `categories` para módulo próprio, conectar ou remover camadas mortas.
+### F15 [LOW] Magic numbers/strings — task_routes.py:110,177, user_routes.py:71,120, task.py:39
+Listas de status/role e faixa de prioridade repetidas como literais → usar as constantes já definidas em `utils/helpers.py`.
+### F16 [LOW] Imports não usados / código morto — task_routes.py:7, user_routes.py:6, report_routes.py:7-8, app.py:7, utils/helpers.py:2-7
+Vários imports nunca referenciados → remover.
+### F17 [LOW] print como logging — 11 ocorrências em task_routes.py, user_routes.py, notification_service.py, utils/helpers.py
+`print()` usado para registrar eventos → trocar por `logging`.
+### F18 [LOW] Construções não idiomáticas — task_routes.py:141,210, helpers.py:103, task.py:38-60, user.py:34-38
+`type(x) == list` e `if/else` retornando booleano literal → `isinstance()` e retorno direto da expressão.
+
+## Deprecated APIs
+`datetime.utcnow()` (deprecated no Python ≥3.12, runtime local 3.14) em models/category.py:11, models/task.py:15-16,52, models/user.py:14, routes/task_routes.py:31,72,215,285, routes/user_routes.py:172, routes/report_routes.py:35,42,45,71,133, services/notification_service.py:35, utils/helpers.py:38 → `datetime.now(timezone.utc)`.
+`Model.query.get(id)` (API legada SQLAlchemy 2.x/Flask-SQLAlchemy 3.x) em routes/task_routes.py:42,51,67,117,122,158,188,195,227, routes/user_routes.py:29,94,136,155, routes/report_routes.py:105,192,213 → `db.session.get(Model, id)`.
+
+## Proposed Target Architecture
+Completar camadas parciais: manter `models/`, `routes/`, `services/`, `utils/`; introduzir `controllers/` e `errors/`; mover regras de overdue/serialização/relatórios para models/services; realinhar `categories` para seu próprio módulo; eliminar credenciais hardcoded e MD5; remover `password` da serialização de `User` (única mudança intencional de contrato). Rotas, métodos HTTP, status codes, comando de execução e porta permanecem iguais.
+
+Relatório completo salvo em `<repo>/reports/audit-task-manager-api.md`.
+
+```
+================================
+Total: 18 findings
+================================
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+```
+[result: success | turns 39 | 288s | cost $1.43]
