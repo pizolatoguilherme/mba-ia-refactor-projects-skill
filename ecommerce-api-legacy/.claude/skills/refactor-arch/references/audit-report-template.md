@@ -8,7 +8,10 @@ Fixed headers stay in English; descriptions, impacts and recommendations are in 
 
 - Findings sorted **CRITICAL → HIGH → MEDIUM → LOW**; within a severity, by impact.
 - IDs `F01..Fnn` follow the sorted order.
-- `File:` always holds exact `path:line` or `path:start-end`, relative to the project root.
+- `File:` always holds exact `path:line` or `path:start-end`, where `path` is the **full path
+  relative to the project root, including every directory** (`src/utils.js:1-7`,
+  `routes/task_routes.py:42` — never `utils.js:1-7` or `task_routes.py:42`). This applies to the
+  Summary table, `File:`, the Deprecated APIs table and any location cited in the text.
   Multiple locations are comma-separated or listed one per line. Lines must match the current
   file content (verify with `grep -n` / `sed -n 'X,Yp'`).
 - **Never** write a bare filename or vague text ("controllers.py", "múltiplas funções", "todas as

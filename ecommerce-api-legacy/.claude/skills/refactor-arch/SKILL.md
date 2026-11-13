@@ -91,6 +91,9 @@ Read `references/anti-patterns-catalog.md` and `references/audit-report-template
 5. Partially organized projects still have findings: inspect the *content* of each layer, not
    only the folder names (business rules in routes, duplicated logic, unused helpers, etc.).
 6. Sort findings CRITICAL → HIGH → MEDIUM → LOW and number them (`F01`, `F02`, …).
+   Write every location as the full path from the project root (`src/utils.js:12`, never
+   `utils.js:12`). Before saving, verify each distinct path you cite exists
+   (`test -f <path> || echo MISSING <path>`) and fix any that does not.
 7. Fill the "Proposed Target Architecture" section using `references/mvc-guidelines.md` §2 (layout
    for this stack and maturity) and §5 (strategy), so Phase 3 executes what the report promised.
 8. Save the **full** report (template, every section) to
@@ -133,6 +136,8 @@ Read `references/mvc-guidelines.md`, `references/refactoring-playbook.md` and
    and HIGH finding is eliminated; MEDIUM and LOW are fixed whenever the change is local and safe.
    Keep the original run command working (`python app.py`, `npm start`, seed scripts, etc.).
    Remove the old files that were fully replaced — no dead duplicates left behind.
+   **Always** create (or update) `.env.example` at the project root listing every environment
+   variable the config reads, with placeholder values — whatever the maturity or stack.
 5. **Validate** (validation-guide §5–§7): boot the refactored app, run the same smoke script,
    compare with the baseline, and re-grep the anti-pattern signals. Every difference must be either
    an intentional contract change (security) or fixed. You get at most 3 fix-and-rerun cycles; if it
@@ -156,6 +161,7 @@ PHASE 3: REFACTORING COMPLETE
   ✓|✗ Application boots without errors (<command>)
   ✓|✗ All <N> original endpoints respond as in the baseline (<N>/<N>)
   ✓|✗ Configuration read from environment (no hardcoded secrets)
+  ✓|✗ .env.example documents all <N> environment variables read by the config
   ✓|✗ Zero CRITICAL/HIGH anti-patterns remaining
 ================================
 ```

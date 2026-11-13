@@ -17,6 +17,12 @@ find . -type f \
 
 - **Source files** = files in the application language(s) (`.py`, `.js`, `.ts`, `.rb`, `.go`,
   `.java`, `.php`, `.cs`…). Report docs/manifests separately if useful, never in the count.
+- **Every** source file counts — including empty `__init__.py`, `index.js` barrels and seed/script
+  files. Do not count by memory: the number printed is the literal output of the command, e.g.
+  ```bash
+  find . -type f \( -name '*.py' -o -name '*.js' -o -name '*.ts' \) <same exclusions as above> | wc -l
+  ```
+  If some files are empty, say so in parentheses: `15 files analyzed (3 empty __init__.py)`.
 - Count lines with `wc -l` on the source files only. Report the exact number of files and an
   approximate line total (`~800`).
 

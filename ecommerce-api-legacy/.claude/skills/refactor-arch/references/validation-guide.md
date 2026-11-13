@@ -98,6 +98,16 @@ grep -rnE "^\s*except:\s*$|print\(|console\.log\(" --include=*.{py,js} .
 ```
 (Exclude `.venv`, `node_modules`, `.claude`.) Every hit is either fixed or justified in the summary.
 
+**`.env.example` completeness** — every variable read by the config must be listed:
+```bash
+grep -rhoE "environ(\.get)?\(\s*['\"][A-Z0-9_]+|getenv\(\s*['\"][A-Z0-9_]+|process\.env\.[A-Z0-9_]+" \
+  --include=*.py --include=*.js . --exclude-dir=.venv --exclude-dir=node_modules --exclude-dir=.claude \
+  | grep -oE "[A-Z0-9_]+$" | sort -u > /tmp/_vars_used
+grep -oE "^[A-Z0-9_]+" .env.example | sort -u > /tmp/_vars_doc
+comm -23 /tmp/_vars_used /tmp/_vars_doc   # must print nothing
+```
+If config reads variables through a helper (e.g. `_bool("FLASK_DEBUG")`), include those names too.
+
 ## §7 Cleanup and report
 
 - Stop every process you started; delete runtime DB files created by the runs and `$WORK` temp
