@@ -122,15 +122,20 @@ run command.
 
 Allowed (and required) intentional changes — list each one under "Contract Changes":
 - Removing sensitive fields from responses (passwords, hashes, secret keys, DB paths).
-- Protecting endpoints that execute arbitrary SQL/code or wipe data: keep the route, require an
-  `X-Admin-Token` header matching `ADMIN_TOKEN` from config; if `ADMIN_TOKEN` is unset the route
-  answers 403. Do not delete these routes.
+- Guarding **only** these routes: (a) routes that execute arbitrary SQL/code sent by the client,
+  (b) routes that wipe/reset the whole data store, (c) routes under an explicit admin namespace
+  (`/admin/...`, `/api/admin/...`). Keep the route, require an `X-Admin-Token` header matching
+  `ADMIN_TOKEN` from config; if `ADMIN_TOKEN` is unset the route answers 403. Do not delete these
+  routes. **Every other endpoint keeps its original access level** — including resource CRUD such
+  as `DELETE /users/:id` or `DELETE /produtos/:id`; for those, recommend authentication in the
+  final summary instead of adding it.
 - Rejecting privilege escalation (e.g. ignore/deny client-chosen `admin` role) when the original
   flow allowed it.
 - Turning crashes into proper 4xx responses (e.g. missing body → 400 instead of 500).
 
-Not in scope by default (recommend in the report instead): adding authentication to endpoints
-that were public, pagination that changes response shape, renaming public routes or fields.
+Not in scope by default (recommend in the report instead): adding authentication to public
+endpoints outside cases (a)–(c) above, pagination that changes response shape, renaming public
+routes or fields.
 
 ## 5. Strategy by maturity
 

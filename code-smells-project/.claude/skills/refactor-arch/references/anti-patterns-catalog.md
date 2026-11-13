@@ -142,7 +142,8 @@ health endpoint reporting `"ambiente": "producao"` while in debug.
 login returning the user record including the password hash.
 **Why**: privilege escalation and unauthenticated access to sensitive operations.
 Note: implementing a full auth system is usually out of refactoring scope — recommend it; but fix
-privilege escalation and protect destructive admin routes (PB-04).
+privilege escalation and guard only the routes listed in `mvc-guidelines.md` §4 (arbitrary
+SQL/code, wipe/reset, `/admin` namespace) with PB-04. Other public routes stay public.
 
 ### AP-12 — Callback hell / multi-step write without transaction
 **Signals**: 3+ nested callbacks (`db.get(..., () => db.run(..., () => db.run(...)))`),

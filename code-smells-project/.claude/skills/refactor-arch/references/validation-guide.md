@@ -40,7 +40,8 @@ Write `$WORK/smoke.sh` once and reuse it unchanged for both runs. Each request p
 # usage: smoke.sh <base_url> <output_file>
 BASE="$1"; OUT="$2"; : > "$OUT"
 req() {  # req METHOD PATH [JSON_BODY] [EXTRA_HEADER]
-  local m="$1" p="$2" body="$3" hdr="$4" args=(-s -o /tmp/_rb -w '%{http_code}' -X "$m")
+  local m="$1" p="$2" body="$3" hdr="$4"
+  local args=(-s -o /tmp/_rb -w '%{http_code}' -X "$m")   # separate `local`: $m must already be set
   [ -n "$body" ] && args+=(-H 'Content-Type: application/json' -d "$body")
   [ -n "$hdr" ] && args+=(-H "$hdr")
   local code; code=$(curl "${args[@]}" "$BASE$p")
