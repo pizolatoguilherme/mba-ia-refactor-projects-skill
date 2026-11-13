@@ -1,0 +1,128 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+  > Bash: pwd && ls -la
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/project-analysis.md
+  > Bash: find . -type f \
+  > Read: <repo>/ecommerce-api-legacy/package.json
+  > Read: <repo>/ecommerce-api-legacy/README.md
+  > Read: <repo>/ecommerce-api-legacy/src/app.js
+  > Read: <repo>/ecommerce-api-legacy/src/AppManager.js
+  > Read: <repo>/ecommerce-api-legacy/src/utils.js
+  > Read: <repo>/ecommerce-api-legacy/api.http
+  > Bash: wc -l src/app.js src/AppManager.js src/utils.js && node --version && npm ls express sqlite3 2>/dev/null
+```
+================================
+PHASE 1: PROJECT ANALYSIS
+================================
+Language:      JavaScript (Node.js v20.20.2 — detectado no ambiente; sem engines no package.json)
+Framework:     Express 4.x (^4.18.2, instalado 4.22.1)
+Dependencies:  sqlite3 (^5.1.6, instalado 5.1.7) — driver direto, sem ORM, sem camada de validação/env loader
+Domain:        API de LMS com fluxo de checkout (usuários, cursos, matrículas, pagamentos, logs de auditoria)
+Architecture:  Monolítica — AppManager.js (141 linhas) concentra schema, seed e as 3 rotas, misturando SQL, regras de pagamento/matrícula e HTTP no mesmo arquivo
+Source files:  3 files analyzed (~180 lines)
+Entry point:   src/app.js (run: npm start, port 3000)
+DB tables:     users, courses, enrollments, payments, audit_logs
+Endpoints:     3 routes detected
+================================
+```
+
+Prosseguindo para a Fase 2 (auditoria de arquitetura).
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/anti-patterns-catalog.md
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/audit-report-template.md
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/mvc-guidelines.md
+  > Bash: echo "--- Buffer/url.parse/createCipher/req.param ---" && grep -rn "new Buffer\|url.parse\|createCipher(\|req.param(\|res.send(status\|app.del(" src/ ; echo "--
+  > Bash: git rev-parse --show-toplevel && basename "$(pwd)" && date +%Y-%m-%d
+  > Bash: ls <repo>/reports 2>/dev/null || echo "no reports dir yet"
+Agora vou montar o relatório completo da Fase 2.
+  > Write: <repo>/reports/audit-ecommerce-api-legacy.md
+Relatório salvo em `reports/audit-ecommerce-api-legacy.md`. Aqui está a versão condensada para revisão:
+
+```
+================================
+ARCHITECTURE AUDIT REPORT
+================================
+Project: ecommerce-api-legacy
+Stack:   JavaScript (Node.js v20.20.2) + Express 4.x (^4.18.2, instalado 4.22.1)
+Files:   3 analyzed | ~180 lines of code
+Architecture: Monolítica — AppManager.js concentra schema, seed, rotas, regras de pagamento/matrícula e relatório
+Date:    2026-11-13
+
+## Summary
+CRITICAL: 4 | HIGH: 5 | MEDIUM: 4 | LOW: 4
+```
+
+### F01 [CRITICAL] Credenciais e segredos hardcoded
+File: utils.js:1-7
+Description: config com dbPass, chave de gateway `pk_live_...` e usuário SMTP como literais.
+Recommendation: mover para variáveis de ambiente em `config/index.js`.
+
+### F02 [CRITICAL] Hash de senha fraco / senha padrão previsível
+File: utils.js:17-23 (+ AppManager.js:68)
+Description: `badCrypto` só faz base64 repetido truncado; senha default `"123456"` quando ausente.
+Recommendation: usar `crypto.scrypt`/`pbkdf2` nativo com salt; exigir senha.
+
+### F03 [CRITICAL] Exposição de dados sensíveis em logs
+File: AppManager.js:45
+Description: log imprime o número do cartão e a chave do gateway de pagamento.
+Recommendation: remover o log sensível.
+
+### F04 [CRITICAL] God Module (AppManager)
+File: AppManager.js:1-141
+Description: uma classe concentra DB, seed, rotas, regra de pagamento e relatório.
+Recommendation: dividir em database/models/services/controllers/routes.
+
+### F05 [HIGH] Regra de negócio dentro da rota (fat controller)
+File: AppManager.js:28-78 — Recommendation: extrair para `checkoutService` + controller fino.
+
+### F06 [HIGH] Estado global mutável
+File: utils.js:9-10 (+2) — Recommendation: remover `globalCache`/`totalRevenue` (não usados de fato).
+
+### F07 [HIGH] Acoplamento forte / efeitos colaterais na inicialização
+File: AppManager.js:4-9, app.js:8-10 — Recommendation: mover conexão para `database/connection.js` injetável.
+
+### F08 [HIGH] Endpoint administrativo sem autenticação
+File: AppManager.js:80-129 — Recommendation: guard `X-Admin-Token` em `/api/admin/*`.
+
+### F09 [HIGH] Callback hell / escrita multi-etapa sem transação
+File: AppManager.js:26-78 (+45) — Recommendation: promisificar driver + `transaction(fn)`.
+
+### F10 [MEDIUM] Consultas N+1 no relatório financeiro
+File: AppManager.js:83-127 — Recommendation: substituir por JOINs.
+
+### F11 [MEDIUM] Validação de entrada ausente/inconsistente
+File: AppManager.js:35 (+1) — Recommendation: validação centralizada.
+
+### F12 [MEDIUM] Exceções engolidas / sucesso falso reportado
+File: AppManager.js:57 (+3) — Recommendation: middleware central de erros.
+
+### F13 [MEDIUM] Integridade referencial ausente no delete
+File: AppManager.js:131-137 — Recommendation: cascade ou bloqueio explícito em transação.
+
+### F14 [LOW] Números/strings mágicos
+File: AppManager.js:46 (+3) — Recommendation: constantes nomeadas.
+
+### F15 [LOW] Nomenclatura pobre
+File: AppManager.js:29-33 (+2) — Recommendation: nomes de domínio internos.
+
+### F16 [LOW] Imports/estado morto não utilizados
+File: AppManager.js:2 (+2) — Recommendation: remover `totalRevenue`/`globalCache` não usados.
+
+### F17 [LOW] console.log como logging
+File: AppManager.js:45 (+2) — Recommendation: logger mínimo com níveis.
+
+## Deprecated APIs
+| File:line | Deprecated usage | Modern replacement |
+|---|---|---|
+| AppManager.js (várias linhas) | Driver `sqlite3` só via callbacks aninhados | wrapper promisificado + async/await |
+
+Nenhuma outra API deprecada (new Buffer, url.parse, createCipher, req.param, app.del) encontrada.
+
+## Proposed Target Architecture
+Monolítica → reestruturar em `src/{config,database,models,services,controllers,routes,middlewares}` (Node/Express), com `/api/admin/financial-report` protegido por `X-Admin-Token`. Rotas, métodos, status codes e payloads originais preservados.
+
+```
+================================
+Total: 17 findings
+================================
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+```
+[result: success | turns 18 | 202s | cost $0.83]

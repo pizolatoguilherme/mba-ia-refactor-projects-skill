@@ -1,0 +1,169 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+  > ToolSearch: 
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/refactoring-playbook.md
+  > Read: <repo>/ecommerce-api-legacy/.claude/skills/refactor-arch/references/validation-guide.md
+  > TodoWrite: 
+  > Bash: WORK=${TMPDIR:-/tmp}/refactor-arch-ecommerce-api-legacy; mkdir -p "$WORK"; echo "$WORK"; ss -ltn 2>/dev/null | grep ':3000' || echo "porta 3000 livre"
+  > Write: /tmp/refactor-arch-ecommerce-api-legacy/smoke.sh
+  > Bash: chmod +x /tmp/refactor-arch-ecommerce-api-legacy/smoke.sh
+Baseline capturado com sucesso (9 requisições, servidor parado). Agora vou planejar a estrutura MVC alvo.
+  > TodoWrite: 
+Estrutura planejada (Node.js/Express, monólito → MVC completo):
+
+```
+ecommerce-api-legacy/
+├── package.json                 # "start": "node src/app.js" (inalterado)
+├── .env.example
+└── src/
+    ├── app.js                   # createApp() + listen (composition root)
+    ├── config/
+    │   └── index.js
+    ├── database/
+    │   └── connection.js         # driver sqlite3 promisificado + transaction() + schema/seed
+    ├── models/
+    │   ├── userModel.js
+    │   ├── courseModel.js
+    │   ├── enrollmentModel.js
+    │   ├── paymentModel.js
+    │   └── auditLogModel.js
+    ├── services/
+    │   ├── checkoutService.js
+    │   ├── reportService.js
+    │   └── userService.js
+    ├── controllers/
+    │   ├── checkoutController.js
+    │   ├── reportController.js
+    │   └── userController.js
+    ├── routes/
+    │   ├── checkoutRoutes.js
+    │   ├── adminRoutes.js
+    │   ├── userRoutes.js
+    │   └── index.js
+    └── middlewares/
+        ├── asyncHandler.js
+        ├── errorHandler.js
+        └── adminAuth.js
+```
+
+Vou implementar nessa ordem: config → database → models → services → controllers → routes → middlewares → app.js, depois removo `AppManager.js` e `utils.js`.
+  > Write: <repo>/ecommerce-api-legacy/.env.example
+  > Write: <repo>/ecommerce-api-legacy/src/config/index.js
+  > Write: <repo>/ecommerce-api-legacy/src/database/connection.js
+  > Write: <repo>/ecommerce-api-legacy/src/utils/password.js
+  > Write: <repo>/ecommerce-api-legacy/src/utils/logger.js
+  > Write: <repo>/ecommerce-api-legacy/src/errors.js
+  > Write: <repo>/ecommerce-api-legacy/src/middlewares/asyncHandler.js
+  > Write: <repo>/ecommerce-api-legacy/src/middlewares/errorHandler.js
+  > Write: <repo>/ecommerce-api-legacy/src/middlewares/adminAuth.js
+  > TodoWrite: 
+Agora os models (acesso a dados parametrizado, sem campos sensíveis expostos).
+  > Write: <repo>/ecommerce-api-legacy/src/models/userModel.js
+  > Write: <repo>/ecommerce-api-legacy/src/models/courseModel.js
+  > Write: <repo>/ecommerce-api-legacy/src/models/enrollmentModel.js
+  > Write: <repo>/ecommerce-api-legacy/src/models/paymentModel.js
+  > Write: <repo>/ecommerce-api-legacy/src/models/auditLogModel.js
+  > Write: <repo>/ecommerce-api-legacy/src/services/checkoutService.js
+  > Write: <repo>/ecommerce-api-legacy/src/services/reportService.js
+  > Edit: <repo>/ecommerce-api-legacy/src/services/reportService.js
+Agora o `userService.js` com delete em cascata transacional (corrige F13/F17).
+  > Write: <repo>/ecommerce-api-legacy/src/services/userService.js
+Agora os controllers, finos, delegando a serviços.
+  > Write: <repo>/ecommerce-api-legacy/src/controllers/checkoutController.js
+  > Write: <repo>/ecommerce-api-legacy/src/controllers/reportController.js
+  > Write: <repo>/ecommerce-api-legacy/src/controllers/userController.js
+  > Write: <repo>/ecommerce-api-legacy/src/routes/checkoutRoutes.js
+  > Write: <repo>/ecommerce-api-legacy/src/routes/adminRoutes.js
+  > Write: <repo>/ecommerce-api-legacy/src/routes/userRoutes.js
+  > Write: <repo>/ecommerce-api-legacy/src/routes/index.js
+Agora o composition root `src/app.js`, mantendo o comando `npm start` e a porta.
+  > Write: <repo>/ecommerce-api-legacy/src/app.js
+  > Bash: rm -f src/AppManager.js src/utils.js && find src -type f | sort
+  > TodoWrite: 
+Agora vou validar: subir a aplicação refatorada e rodar o mesmo smoke script.
+  > Bash: cd <repo>/ecommerce-api-legacy
+  > Bash: cd /tmp/refactor-arch-ecommerce-api-legacy
+Diffs batem exatamente com as duas mudanças de contrato intencionais (guard de admin e remoção da senha padrão). Agora re-rodo os greps de anti-padrões na árvore refatorada.
+  > Bash: cd <repo>/ecommerce-api-legacy
+  > Bash: sed -n '1,20p' src/models/paymentModel.js
+  > Bash: git status --short && find . -name "*.db" -not -path "./node_modules/*" 2>/dev/null; ls -la
+No artefatos de runtime sobraram (DB em memória). Vou limpar os temporários de validação.
+  > Bash: rm -rf /tmp/refactor-arch-ecommerce-api-legacy
+  > TodoWrite: 
+```
+================================
+PHASE 3: REFACTORING COMPLETE
+================================
+## New Project Structure
+ecommerce-api-legacy/
+├── package.json                 # "start": "node src/app.js" (inalterado)
+├── .env.example
+└── src/
+    ├── app.js                   # createApp() + listen (composition root)
+    ├── errors.js                 # AppError/ValidationError/NotFoundError/ForbiddenError
+    ├── config/
+    │   └── index.js
+    ├── database/
+    │   └── connection.js          # driver promisificado + transaction() + schema/seed
+    ├── models/
+    │   ├── userModel.js
+    │   ├── courseModel.js
+    │   ├── enrollmentModel.js
+    │   ├── paymentModel.js
+    │   └── auditLogModel.js
+    ├── services/
+    │   ├── checkoutService.js
+    │   ├── reportService.js
+    │   └── userService.js
+    ├── controllers/
+    │   ├── checkoutController.js
+    │   ├── reportController.js
+    │   └── userController.js
+    ├── routes/
+    │   ├── checkoutRoutes.js
+    │   ├── adminRoutes.js
+    │   ├── userRoutes.js
+    │   └── index.js
+    ├── middlewares/
+    │   ├── asyncHandler.js
+    │   ├── errorHandler.js
+    │   └── adminAuth.js
+    └── utils/
+        ├── password.js
+        └── logger.js
+
+## Findings Resolution
+F01 [CRITICAL] Credenciais hardcoded — resolvida (config/index.js lê de env, `.env.example` criado)
+F02 [CRITICAL] Hash fraco / senha default — resolvida (scrypt com salt em utils/password.js; senha agora obrigatória para novo usuário)
+F03 [CRITICAL] Log de dados sensíveis — resolvida (checkoutService loga só últimos 4 dígitos, sem a chave do gateway)
+F04 [CRITICAL] God Module (AppManager) — resolvida (dividido em database/models/services/controllers/routes)
+F05 [HIGH] Regra de negócio na rota — resolvida (extraída para checkoutService/checkoutController)
+F06 [HIGH] Estado global mutável — resolvida (globalCache/totalRevenue removidos, não eram consumidos)
+F07 [HIGH] Acoplamento forte na inicialização — resolvida (conexão única em database/connection.js, composition root em app.js)
+F08 [HIGH] Admin sem autenticação — resolvida (middleware adminAuth + X-Admin-Token em /api/admin/*)
+F09 [HIGH] Callback hell / sem transação — resolvida (driver promisificado + `transaction()`; checkout e delete de usuário são atômicos; corrigida a ordem checkout→usuário órfão em pagamento recusado)
+F10 [MEDIUM] N+1 no relatório — resolvida (uma query com JOINs em reportService)
+F11 [MEDIUM] Validação inconsistente — resolvida (senha obrigatória no checkout; mesma checagem de campos mantida)
+F12 [MEDIUM] Exceções engolidas — resolvida (erros propagados via asyncHandler + errorHandler central)
+F13 [MEDIUM] Integridade referencial no delete — resolvida (userService.remove em transação, cascade de enrollments/payments)
+F14 [LOW] Números/strings mágicos — resolvida (PAYMENT_STATUS e APPROVED_CARD_PREFIX em config)
+F15 [LOW] Nomenclatura pobre — resolvida (variáveis internas renomeadas; nomes de payload público mantidos)
+F16 [LOW] Imports/estado morto — resolvida (totalRevenue/globalCache removidos)
+F17 [LOW] console.log como logging — resolvida (utils/logger.js com níveis)
+
+## Contract Changes
+- `GET /api/admin/financial-report` agora exige header `X-Admin-Token` (403 sem token) — exigido pela política de segurança para rotas `/admin/*`.
+- `POST /api/checkout` sem o campo `pwd` agora responde `400 "Senha é obrigatória"` em vez de criar o usuário com a senha padrão `"123456"` — elimina a senha previsível (F02).
+- `DELETE /api/users/:id` agora remove matrículas/pagamentos relacionados em cascata e responde `200 "Usuário deletado."` (antes: `"...mas as matrículas e pagamentos ficaram sujos no banco."`) — corrige a integridade referencial (F13).
+- Ordem dos cursos em `GET /api/admin/financial-report` passou a ser determinística (por `id`); antes dependia da ordem de conclusão de callbacks assíncronos aninhados (efeito colateral do N+1 corrigido em F10).
+- Log de checkout deixou de imprimir o número completo do cartão e a chave do gateway (F03) — loga apenas os últimos 4 dígitos.
+
+## Validation
+  ✓ Application boots without errors (`npm start` / `node src/app.js`, porta 3000)
+  ✓ All 9 smoke requests respond as in the baseline (9/9, divergências limitadas às 2 mudanças de contrato documentadas acima)
+  ✓ Configuration read from environment (no hardcoded secrets)
+  ✓ Zero CRITICAL/HIGH anti-patterns remaining
+================================
+```
+
+**Recomendações fora do escopo (não implementadas):** adicionar autenticação de usuário real a `DELETE /api/users/:id` (fora do contrato original, conforme política de não adicionar auth a CRUD público); persistência em arquivo/volume para o SQLite (hoje `:memory:`, mantido por ser o comportamento original).
+[result: success | turns 45 | 290s | cost $2.33]
