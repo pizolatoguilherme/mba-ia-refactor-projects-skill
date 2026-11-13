@@ -100,20 +100,21 @@ Read `references/anti-patterns-catalog.md` and `references/audit-report-template
    if not in a git repo, use `./reports/`). This is the only file you may write before approval.
    Then run the **mandatory self-check** from `references/audit-report-template.md` and fix the
    report until every check prints nothing. Mention in the conversation that the self-check passed.
-9. Print the report in the conversation so the human can review it before approving. Use exactly
-   this shape — the number of `### Fnn` entries printed **must equal** the Total:
+9. Print the report in the conversation. **Why this matters:** the human decides `y/n` by reading
+   the conversation — they do not open the saved file. A summary table alone does not show *what
+   is wrong and what will change*, so printing only the table (or pointing to the file instead of
+   listing the findings) is a failure of Phase 2. Use exactly this shape, with **one two-line entry
+   for every finding** — the number of `### Fnn` lines printed must equal the Total:
 
    ````
    <header block + "## Summary" with counts and table>
 
    ## Findings
-   ### F01 [SEVERITY] <name>
-   File: <exact locations>
-   Description: <one line>
-   Recommendation: <one line>
-
-   ### F02 [SEVERITY] <name>
-   ...   (one entry for EVERY finding, F01 to Fnn — a summary table alone is not enough)
+   ### F01 [SEVERITY] <name> — <main path:lines>
+   <one sentence: the problem> → <one sentence: the fix>
+   ### F02 [SEVERITY] <name> — <main path:lines>
+   <problem> → <fix>
+   ...   (F01 to Fnn, none skipped)
 
    ## Deprecated APIs
    <table or "Nenhuma API deprecated encontrada">
@@ -121,7 +122,7 @@ Read `references/anti-patterns-catalog.md` and `references/audit-report-template
    ## Proposed Target Architecture
    <tree + strategy>
    ````
-   Then give the path of the saved full report. Never claim to have printed content you did not print.
+   Then give the path of the saved full report (it has evidence, impact and full recommendation).
 10. End with exactly:
 
 ```
