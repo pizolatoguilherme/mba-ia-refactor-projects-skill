@@ -1,0 +1,208 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+I'll start Phase 1 by reading the analysis guidelines and then exploring the project structure.
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/project-analysis.md
+  > Bash: find . -type f \( -name "*.venv*" -prune \) -o -type d \( -name ".venv" -o -name "venv" -o -name "node_modules" -o -name ".git" -o -name "__pycache__" -o -name 
+  > Read: <repo>/code-smells-project/app.py
+  > Read: <repo>/code-smells-project/controllers.py
+  > Read: <repo>/code-smells-project/database.py
+  > Read: <repo>/code-smells-project/models.py
+  > Read: <repo>/code-smells-project/requirements.txt
+  > Read: <repo>/code-smells-project/README.md
+  > Bash: wc -l app.py controllers.py database.py models.py && ls -la && python3 --version
+  > Bash: git rev-parse --show-toplevel
+```
+================================
+PHASE 1: PROJECT ANALYSIS
+================================
+Language:      Python (detectado no runtime local: 3.14.4; sem pin em requirements.txt)
+Framework:     Flask 3.1.1 (flask-cors 5.0.1)
+Dependencies:  flask-cors (CORS liberado para todas as origens), sqlite3 (stdlib)
+Domain:        API de E-commerce (produtos, usuários, pedidos/itens_pedido, relatórios de vendas)
+Architecture:  Monolítica — models.py concentra SQL concatenada e regras de negócio (estoque, desconto) de todos os domínios; controllers.py replica o mesmo tratamento de erro em cada função; app.py define rotas /admin/reset-db e /admin/query com SQL bruto direto na camada de entrada, sem passar por controller/model
+Source files:  4 arquivos analisados (app.py, controllers.py, database.py, models.py — ~780 linhas)
+Entry point:   app.py (run: python app.py, porta 5000)
+DB tables:     produtos, usuarios, pedidos, itens_pedido (SQLite, arquivo loja.db, conexão global em database.py)
+Endpoints:     19 rotas detectadas
+================================
+```
+
+Prosseguindo direto para a Fase 2 (auditoria de arquitetura).
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/anti-patterns-catalog.md
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/audit-report-template.md
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/mvc-guidelines.md
+  > Bash: echo "--- utcnow/query.get/before_first_request ---" && grep -rn "utcnow\|\.query\.get(\|before_first_request" --include=*.py . ; echo "--- print( ---" && grep 
+No deprecated API usages found. Now I have everything needed to compile the full audit report.
+  > Bash: mkdir -p <repo>/reports && date +%Y-%m-%d
+  > Write: <repo>/reports/audit-code-smells-project.md
+Relatório completo salvo. Aqui está a versão condensada para revisão:
+  > Bash: echo done
+```
+================================
+ARCHITECTURE AUDIT REPORT
+================================
+Project: code-smells-project
+Stack:   Python (3.14 local) + Flask 3.1.1
+Files:   4 analisados | ~780 linhas de código
+Architecture: Monolítica — models.py concentra SQL concatenada e regras de negócio (estoque, desconto) de todos os domínios; controllers.py replica o mesmo tratamento de erro em cada função; app.py define rotas administrativas com SQL bruto direto na camada de entrada, sem passar por controller/model
+Date:    2026-11-13
+
+## Summary
+CRITICAL: 6 | HIGH: 5 | MEDIUM: 7 | LOW: 4
+
+| ID | Severity | Anti-pattern | Location |
+|----|----------|--------------|----------|
+| F01 | CRITICAL | Credencial/segredo hardcoded | app.py:7 |
+| F02 | CRITICAL | SQL Injection | models.py:28 (+17) |
+| F03 | CRITICAL | Endpoint admin destrutivo/SQL arbitrário sem autenticação | app.py:47-78 |
+| F04 | CRITICAL | Senha em texto puro (armazenamento e comparação) | database.py:75-79 (+2) |
+| F05 | CRITICAL | Exposição de dados sensíveis em respostas | models.py:79-86 (+3) |
+| F06 | CRITICAL | God Module | models.py:1-314 (+1) |
+| F07 | HIGH | Lógica de negócio e efeitos colaterais no controller | controllers.py:24-96 (+2) |
+| F08 | HIGH | Estado global mutável / conexão singleton compartilhada | database.py:4 (+3) |
+| F09 | HIGH | Acoplamento forte / sem app factory / efeitos no import | app.py:1-30 |
+| F10 | HIGH | Defaults de runtime inseguros | app.py:8 (+3) |
+| F11 | HIGH | Autenticação/autorização inexistente | controllers.py:167-220 |
+| F12 | MEDIUM | Escrita multi-etapas sem transação segura | models.py:133-169 |
+| F13 | MEDIUM | Consultas N+1 | models.py:187-199 (+1) |
+| F14 | MEDIUM | Lógica duplicada | controllers.py:28-50 (+2) |
+| F15 | MEDIUM | Validação de entrada ausente/inconsistente | controllers.py:64-96 (+1) |
+| F16 | MEDIUM | Exceções engolidas / detalhes internos expostos | controllers.py:10-12 (+15) |
+| F17 | MEDIUM | Falta de integridade referencial no delete | models.py:65-70 |
+| F18 | MEDIUM | Responsabilidade mal posicionada | app.py:47-78 |
+| F19 | LOW | Números/strings mágicas | controllers.py:52 (+2) |
+| F20 | LOW | Import não utilizado | models.py:2 |
+| F21 | LOW | `print` como logging | app.py:56 (+4) |
+| F22 | LOW | Construções não idiomáticas (parâmetro `id` sombreia builtin) | controllers.py:14 (+7) |
+
+## Findings (condensado)
+
+### F01 [CRITICAL] Credencial/segredo hardcoded
+File: app.py:7
+Description: `SECRET_KEY` do Flask escrita como literal no código.
+Recommendation: Ler de env var com fallback aleatório + aviso de log.
+
+### F02 [CRITICAL] SQL Injection
+File: models.py:28,48-50,58-61,68,92,109-111,126-129,140,148-151,155-166,174,188,192,220,224,279-280,289-297
+Description: Quase toda query de models.py é concatenada com dados do request, incluindo o login (`' OR '1'='1` faz bypass).
+Recommendation: Queries parametrizadas (`?`) em todos os models.
+
+### F03 [CRITICAL] Endpoint admin destrutivo/SQL arbitrário sem autenticação
+File: app.py:47-78
+Description: `/admin/reset-db` e `/admin/query` executam contra o banco sem nenhuma autenticação.
+Recommendation: Exigir `X-Admin-Token` (config `ADMIN_TOKEN`), 403 se não configurado.
+
+### F04 [CRITICAL] Senha em texto puro
+File: database.py:75-79, models.py:109-111, models.py:122-131
+Description: Senha armazenada e comparada sem hashing, no seed, cadastro e login.
+Recommendation: `werkzeug.security.generate_password_hash`/`check_password_hash`.
+
+### F05 [CRITICAL] Exposição de dados sensíveis em respostas
+File: models.py:79-86,94-102, controllers.py:128-144,276-290
+Description: `/usuarios` expõe `senha`; `/health` expõe `secret_key`, `db_path`, `debug`.
+Recommendation: Remover campos sensíveis da serialização.
+
+### F06 [CRITICAL] God Module
+File: models.py:1-314, controllers.py:1-292
+Description: Um único arquivo concentra dados+regras de 3 domínios; controller replica a mesma estrutura 19x.
+Recommendation: Dividir em módulos por domínio (models/ e controllers/).
+
+### F07 [HIGH] Lógica de negócio e efeitos colaterais no controller
+File: controllers.py:24-96,208-210,247-250
+Description: Validação duplicada create/update; "notificações" via `print` direto no controller.
+Recommendation: Extrair validador reutilizável e `notification_service.py`.
+
+### F08 [HIGH] Estado global mutável / conexão singleton
+File: database.py:4,7-10
+Description: Uma conexão SQLite global compartilhada entre threads/requisições.
+Recommendation: Conexão por requisição via `flask.g` + teardown.
+
+### F09 [HIGH] Acoplamento forte / sem app factory
+File: app.py:1-30
+Description: App criado e rotas registradas no import, sem `create_app()`.
+Recommendation: Introduzir composition root com Blueprints.
+
+### F10 [HIGH] Defaults de runtime inseguros
+File: app.py:8,9,88, controllers.py:286,288
+Description: `DEBUG=True` + `0.0.0.0` + CORS aberto + health mentindo "producao".
+Recommendation: Config por env var, default seguro.
+
+### F11 [HIGH] Autenticação/autorização inexistente
+File: controllers.py:167-220
+Description: Login não emite token; `/pedidos` aceita `usuario_id` do body sem verificação.
+Recommendation: Registrar limitação; proteger ao menos rotas administrativas (F03).
+
+### F12 [MEDIUM] Escrita multi-etapas sem transação segura
+File: models.py:133-169
+Description: Insert pedido+itens+update estoque sem transação explícita, agravado pela conexão global (F08).
+Recommendation: Transação explícita via helper em `database.py`.
+
+### F13 [MEDIUM] Consultas N+1
+File: models.py:187-199,219-231
+Description: Query de itens por pedido, e query de produto por item — duas camadas de N+1.
+Recommendation: Um único `JOIN`.
+
+### F14 [MEDIUM] Lógica duplicada
+File: controllers.py:28-50,72-90; models.py:9-21,31-40,304-313,171-201,203-233
+Description: Validação e serialização repetidas; duas funções de listagem de pedidos quase idênticas.
+Recommendation: Extrair validador e serializador únicos.
+
+### F15 [MEDIUM] Validação de entrada ausente/inconsistente
+File: controllers.py:64-96,188-206
+Description: `atualizar_produto` não valida categoria (ao contrário do create); itens de pedido não validados.
+Recommendation: Reaproveitar validador único em create/update.
+
+### F16 [MEDIUM] Exceções engolidas / detalhes internos expostos
+File: controllers.py:10-12 (+15 ocorrências)
+Description: 16 funções repetem `except Exception: return str(e)`, sem handler central.
+Recommendation: `middlewares/error_handler.py` com erros tipados.
+
+### F17 [MEDIUM] Falta de integridade referencial no delete
+File: models.py:65-70
+Description: Produto pode ser excluído mesmo referenciado em `itens_pedido`; sem `PRAGMA foreign_keys`.
+Recommendation: `FOREIGN KEY` + bloqueio/soft-delete.
+
+### F18 [MEDIUM] Responsabilidade mal posicionada
+File: app.py:47-78
+Description: Lógica admin escrita direto no entry point, fora do padrão controller das demais rotas.
+Recommendation: Mover para `admin_controller.py`.
+
+### F19 [LOW] Números/strings mágicas
+File: controllers.py:52,242, models.py:256-262
+Description: Categorias, status e faixas de desconto hardcoded.
+Recommendation: Constantes em `config/settings.py`.
+
+### F20 [LOW] Import não utilizado
+File: models.py:2
+Description: `import sqlite3` nunca referenciado.
+Recommendation: Remover.
+
+### F21 [LOW] `print` como logging
+File: app.py:56,83-86 + controllers.py (14 ocorrências)
+Description: Toda a app usa `print` para eventos/erros.
+Recommendation: `logging.getLogger(__name__)`.
+
+### F22 [LOW] Parâmetro `id` sombreia builtin
+File: controllers.py:14,64,98,136; models.py:24,54,65,89
+Description: Vários parâmetros chamados `id`.
+Recommendation: Renomear para `produto_id`/`usuario_id`/`pedido_id`.
+
+## Deprecated APIs
+Nenhuma API deprecated encontrada (verificado `utcnow`, `.query.get(`, `before_first_request`, `distutils`/`imp` — nenhum uso presente).
+
+## Proposed Target Architecture
+Reestruturar o monólito em `src/` (config, database, models/, controllers/, views/, services/, middlewares/), dividido por domínio (produto, usuario, pedido, relatorio, admin), deletando app.py/controllers.py/database.py/models.py originais.
+
+================================
+Total: 22 findings
+================================
+```
+
+Relatório completo salvo em `<repo>/reports/audit-code-smells-project.md`.
+
+```
+================================
+Total: 22 findings
+================================
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+```
+[result: success | turns 18 | 235s | cost $0.98]

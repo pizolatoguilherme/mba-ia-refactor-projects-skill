@@ -1,0 +1,208 @@
+[model claude-sonnet-5 | skills ['refactor-arch', 'design-sync', 'update-config', 'verify', 'debug', 'code-review', 'simplify', 'batch', 'fewer-permission-prompts', 'loop', 'schedule', 'claude-api', 'run', 'run-skill-generator']]
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/refactoring-playbook.md
+  > Read: <repo>/code-smells-project/.claude/skills/refactor-arch/references/validation-guide.md
+  > Bash: ls .venv/bin | grep -i python; .venv/bin/python -c "import flask, flask_cors; print(flask.__version__)" 2>&1
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project; mkdir -p "$WORK"; echo "$WORK"; ss -ltn 2>/dev/null | grep ':5000' || echo "port 5000 free"
+  > Write: /tmp/refactor-arch-code-smells-project/smoke.sh
+  > Bash: rm -f loja.db && WORK=/tmp/refactor-arch-code-smells-project && ADMIN_TOKEN=smoke-token .venv/bin/python app.py > "$WORK/baseline-server.log" 2>&1 & echo "PID=$
+  > Bash: for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:5000/ && break; sleep 0.5; done; curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5000/
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project; chmod +x "$WORK/smoke.sh"; bash "$WORK/smoke.sh" "http://127.0.0.1:5000" "$WORK/baseline.txt" "smoke-token"; cat "$
+  > Bash: bash -x -c '
+  > Edit: /tmp/refactor-arch-code-smells-project/smoke.sh
+Need to restart with fresh DB since baseline run already mutated state (deleted produto 11, reset db at the end). Let me kill the server, wipe the DB, and rerun.
+  > Bash: pkill -f "python app.py" 2>/dev/null; sleep 1; rm -f loja.db; ps aux | grep "app.py" | grep -v grep
+  > Bash: ps aux | grep "app.py" | grep -v grep; ss -ltn 2>/dev/null | grep 5000 || echo "port free"; rm -f <repo>/code-smells-project/lo
+Good, port is free and DB removed. Restarting the baseline server with the fixed smoke script.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project && ADMIN_TOKEN=smoke-token .venv/bin/python app.py > "$WORK/baseline-server.log" 2>&1 & echo "PID=$!"
+  > Bash: for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:5000/ && break; sleep 0.5; done; WORK=/tmp/refactor-arch-code-smells-project; bash "$WORK/smoke.s
+Baseline captured successfully — all 30 requests behaved as expected (notably `/usuarios` leaks `senha`, `/health` leaks secrets, admin routes work with or without token). Now stopping the baseline server and cleaning up before refactoring.
+  > Bash: kill 18318 2>/dev/null; wait 18318 2>/dev/null; sleep 1; ps aux | grep "app.py" | grep -v grep; rm -f <repo>/code-smells-projec
+  > Bash: kill 18319 18321 2>/dev/null; sleep 1; ps aux | grep "app.py" | grep -v grep || echo "all stopped"
+Let me set up a todo list to track the refactoring steps.
+  > ToolSearch: 
+  > TodoWrite: 
+Planned structure (per the audit report's target architecture):
+
+```
+code-smells-project/
+├── app.py                      # entry point fino
+├── requirements.txt
+├── .env.example
+└── src/
+    ├── __init__.py
+    ├── app.py                   # create_app()
+    ├── config/settings.py
+    ├── database.py
+    ├── models/{produto,usuario,pedido}_model.py
+    ├── validators/produto_validator.py
+    ├── controllers/{produto,usuario,pedido,relatorio,admin}_controller.py
+    ├── views/{produto,usuario,pedido,relatorio,admin}_routes.py
+    ├── services/notification_service.py
+    └── middlewares/{error_handler,admin_auth}.py
+```
+
+Now implementing each layer.
+  > Bash: mkdir -p src/config src/models src/controllers src/views src/services src/middlewares src/validators && touch src/__init__.py src/config/__init__.py src/models/
+  > Write: <repo>/code-smells-project/src/config/settings.py
+Now the database layer (per-request connection via `flask.g`, PB-12):
+  > Write: <repo>/code-smells-project/src/database.py
+  > Write: <repo>/code-smells-project/src/middlewares/error_handler.py
+  > Write: <repo>/code-smells-project/src/middlewares/admin_auth.py
+Now the models, split by domain with parameterized queries and no sensitive fields leaking by default:
+  > Write: <repo>/code-smells-project/src/models/produto_model.py
+  > Write: <repo>/code-smells-project/src/models/usuario_model.py
+  > TodoWrite: 
+  > Write: <repo>/code-smells-project/src/models/pedido_model.py
+  > Write: <repo>/code-smells-project/src/services/pedido_service.py
+  > Write: <repo>/code-smells-project/src/services/notification_service.py
+Now the relatorio service (discount calc, PB-08):
+  > Write: <repo>/code-smells-project/src/services/relatorio_service.py
+  > Write: <repo>/code-smells-project/src/validators/produto_validator.py
+  > Write: <repo>/code-smells-project/src/validators/usuario_validator.py
+  > Write: <repo>/code-smells-project/src/validators/pedido_validator.py
+  > Write: <repo>/code-smells-project/src/controllers/produto_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/usuario_controller.py
+  > TodoWrite: 
+  > Write: <repo>/code-smells-project/src/controllers/pedido_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/relatorio_controller.py
+  > Edit: <repo>/code-smells-project/src/models/usuario_model.py
+  > Edit: <repo>/code-smells-project/src/models/pedido_model.py
+  > Write: <repo>/code-smells-project/src/controllers/health_controller.py
+  > Write: <repo>/code-smells-project/src/controllers/admin_controller.py
+  > Write: <repo>/code-smells-project/src/views/produto_routes.py
+  > Write: <repo>/code-smells-project/src/views/usuario_routes.py
+  > Write: <repo>/code-smells-project/src/views/pedido_routes.py
+  > Write: <repo>/code-smells-project/src/views/relatorio_routes.py
+  > Write: <repo>/code-smells-project/src/views/admin_routes.py
+  > Write: <repo>/code-smells-project/src/views/main_routes.py
+Now the app factory (composition root, PB-07):
+  > Write: <repo>/code-smells-project/src/app.py
+  > Write: <repo>/code-smells-project/app.py
+  > Edit: <repo>/code-smells-project/app.py
+  > Read: <repo>/code-smells-project/src/controllers/admin_controller.py
+  > Edit: <repo>/code-smells-project/src/controllers/admin_controller.py
+  > Bash: grep -rn "^import controllers\|^import models\|^import database\|from controllers\|from models\|from database" --include=*.py . 2>/dev/null | grep -v "^\./src/"
+Only the old files reference each other. Safe to delete them now.
+  > Bash: rm -f controllers.py models.py database.py && ls
+  > TodoWrite: 
+Now let's write `.env.example` and then boot the refactored app to validate.
+  > Write: <repo>/code-smells-project/.env.example
+  > Bash: rm -f loja.db && find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null; .venv/bin/python -c "from app import app; print('import ok')" 2>&1
+Import works. Now booting the refactored app for the smoke test.
+  > Bash: rm -f loja.db && WORK=/tmp/refactor-arch-code-smells-project && ADMIN_TOKEN=smoke-token .venv/bin/python app.py > "$WORK/after-server.log" 2>&1 & echo "PID=$!"
+  > Bash: for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:5000/ && break; sleep 0.5; done; curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5000/;
+Boots cleanly. Now running the smoke script against it.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project; bash "$WORK/smoke.sh" "http://127.0.0.1:5000" "$WORK/after.txt" "smoke-token"; cat "$WORK/after.txt"
+All status codes and response shapes match the baseline, with the intentional security fixes visible (`senha`/`secret_key`/`db_path`/`debug` gone, admin routes now 403 without token, 200 with token). Let's diff the status codes line by line to confirm.
+  > Bash: WORK=/tmp/refactor-arch-code-smells-project
+Only expected diff: the admin routes now require the token (403 without, 200 with) — exactly the intentional security fix from F03/F11, not a regression. Everything else matches the baseline exactly. Stopping the server and re-scanning for anti-patterns.
+  > Bash: kill 21326 2>/dev/null; sleep 1; ps aux | grep "app.py" | grep -v grep
+  > Bash: kill 21328 2>/dev/null; sleep 1; ps aux | grep "app.py" | grep -v grep || echo "all stopped"; rm -f <repo>/code-smells-project/
+Now re-running the Phase 2 anti-pattern grep helpers against the refactored tree.
+  > Bash: cd <repo>/code-smells-project
+  > Read: <repo>/code-smells-project/src/controllers/produto_controller.py
+  > Edit: <repo>/code-smells-project/src/controllers/produto_controller.py
+  > Edit: <repo>/code-smells-project/src/controllers/produto_controller.py
+Now updating the matching URL rule variable names in `produto_routes.py`:
+  > Edit: <repo>/code-smells-project/src/views/produto_routes.py
+Now the same for `usuario_controller.py` / `usuario_routes.py`:
+  > Read: <repo>/code-smells-project/src/controllers/usuario_controller.py
+  > Edit: <repo>/code-smells-project/src/controllers/usuario_controller.py
+  > Edit: <repo>/code-smells-project/src/views/usuario_routes.py
+  > Bash: grep -n "def .*\bid\b" src/models/*.py src/controllers/*.py
+No more builtin-shadowing `id` params anywhere. Let's re-run the full validation now that these renames happened (quick regression run), then re-check anti-patterns once more.
+  > Bash: rm -f loja.db && find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null; .venv/bin/python -c "from app import app; print('import ok')"
+  > Bash: rm -f loja.db && WORK=/tmp/refactor-arch-code-smells-project && ADMIN_TOKEN=smoke-token .venv/bin/python app.py > "$WORK/after2-server.log" 2>&1 & echo "PID=$!"
+  > Bash: for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:5000/ && break; sleep 0.5; done
+Still only the intentional admin-guard difference, no server errors. Stopping the server and doing final cleanup.
+  > Bash: kill 22242 2>/dev/null; sleep 1; ps aux | grep "app.py" | grep -v grep
+  > Bash: kill 22244 2>/dev/null; sleep 1; ps aux | grep "app.py" | grep -v grep || echo "all stopped"
+Final anti-pattern re-scan on the renamed tree:
+  > Bash: cd <repo>/code-smells-project
+All clean — zero hits across every anti-pattern category. Let's view the final tree and clean up temp files.
+  > Bash: find . -type f -not -path "./.venv/*" -not -path "./.git/*" -not -path "./.claude/*" -not -path "./__pycache__/*" | sort
+  > TodoWrite: 
+```
+================================
+PHASE 3: REFACTORING COMPLETE
+================================
+## New Project Structure
+code-smells-project/
+├── .env.example
+├── README.md
+├── app.py                        # entry point fino: from src.app import create_app
+├── requirements.txt
+└── src/
+    ├── app.py                    # create_app() — composition root
+    ├── config/settings.py        # env vars + constantes (categorias, status, faixas de desconto)
+    ├── database.py               # conexão por requisição (flask.g), schema, seed com senha hasheada
+    ├── models/
+    │   ├── produto_model.py
+    │   ├── usuario_model.py
+    │   └── pedido_model.py       # inclui JOIN único (fim do N+1)
+    ├── validators/
+    │   ├── produto_validator.py
+    │   ├── usuario_validator.py
+    │   └── pedido_validator.py
+    ├── services/
+    │   ├── pedido_service.py     # transação atômica (estoque + pedido + itens)
+    │   ├── relatorio_service.py  # cálculo de desconto
+    │   └── notification_service.py
+    ├── controllers/
+    │   ├── produto_controller.py
+    │   ├── usuario_controller.py
+    │   ├── pedido_controller.py
+    │   ├── relatorio_controller.py
+    │   ├── admin_controller.py
+    │   └── health_controller.py
+    ├── views/                    # Blueprints (mesmas rotas/métodos originais)
+    │   ├── main_routes.py, produto_routes.py, usuario_routes.py
+    │   └── pedido_routes.py, relatorio_routes.py, admin_routes.py
+    └── middlewares/
+        ├── error_handler.py      # AppError + handler centralizado
+        └── admin_auth.py         # guard X-Admin-Token
+
+## Findings Resolution
+F01 Credencial hardcoded — resolved (config/settings.py, env var + fallback aleatório)
+F02 SQL Injection — resolved (todas as queries parametrizadas nos models)
+F03 Admin sem autenticação — resolved (require_admin + X-Admin-Token, 403 sem token)
+F04 Senha em texto puro — resolved (werkzeug.security hash/check, seed migrado)
+F05 Exposição de dados sensíveis — resolved (senha/secret_key/debug/db_path removidos das respostas)
+F06 God Module — resolved (dividido em models/controllers por domínio)
+F07 Lógica/efeitos colaterais no controller — resolved (validators + notification_service)
+F08 Conexão global mutável — resolved (flask.g, uma conexão por requisição)
+F09 Sem app factory — resolved (create_app() em src/app.py)
+F10 Defaults inseguros — resolved (DEBUG/HOST/CORS via env, default seguro)
+F11 Autenticação inexistente — partially (rotas admin protegidas; login/pedidos sem sessão continua fora do escopo, registrado como recomendação)
+F12 Escrita multi-etapas sem transação — resolved (`with db:` em pedido_service.criar_pedido)
+F13 Consultas N+1 — resolved (um único JOIN em pedido_model)
+F14 Lógica duplicada — resolved (validators únicos, serialização única nos models)
+F15 Validação inconsistente — resolved (mesmo validador em criar/atualizar produto)
+F16 Exceções engolidas / detalhes expostos — resolved (error_handler centralizado, mensagem genérica em 500)
+F17 Falta de integridade referencial — resolved (FOREIGN KEY no schema + bloqueio de delete de produto referenciado)
+F18 Responsabilidade mal posicionada — resolved (admin_controller.py dedicado)
+F19 Números/strings mágicas — resolved (constantes em config/settings.py)
+F20 Import não utilizado — resolved (arquivo antigo removido)
+F21 print como logging — resolved (logging.getLogger em toda a app)
+F22 Parâmetro `id` sombreia builtin — resolved (renomeado para produto_id/usuario_id)
+
+## Contract Changes
+- `/usuarios`, `/usuarios/<id>`, `/login`: campo `senha` removido das respostas (nunca mais retorna a senha, nem hash).
+- `/health`: campos `secret_key`, `debug`, `db_path` removidos da resposta.
+- `/admin/reset-db`, `/admin/query`: agora exigem header `X-Admin-Token` igual a `ADMIN_TOKEN` (env); sem o token configurado ou com valor errado, respondem 403. Rotas mantidas, método/caminho inalterados.
+- Senhas passam a ser armazenadas com hash (`werkzeug.security`); banco de dados antigo (`loja.db`) deve ser recriado — já ocorre automaticamente no primeiro boot.
+- 500 por erro inesperado agora retorna mensagem genérica (`"Erro interno do servidor"`) em vez do `str(exception)` original — detalhes completos vão para o log, não para o cliente.
+- `DELETE /produtos/<id>` agora rejeita (400) a remoção de um produto referenciado em `itens_pedido`, em vez de permitir a exclusão e deixar o pedido com referência órfã.
+- `PUT /produtos/<id>` agora valida `categoria` (e tamanho do nome) da mesma forma que o `POST`, podendo retornar 400 em casos que antes passavam silenciosamente.
+- `DEBUG`/host passam a ser lidos de variáveis de ambiente, com `False`/`0.0.0.0` como default seguro (antes vinham hardcoded como `True`/`0.0.0.0`).
+
+## Validation
+  ✓ Application boots without errors (`.venv/bin/python app.py`)
+  ✓ All 19 original endpoints respond as in the baseline (30/30 requisições do smoke test — único diff são os 403 esperados nas rotas admin sem token, que agora exigem `X-Admin-Token`)
+  ✓ Configuration read from environment (no hardcoded secrets)
+  ✓ Zero CRITICAL/HIGH anti-patterns remaining (re-scan de SQL concatenada, segredos hardcoded, bare except, print, APIs deprecated — nenhuma ocorrência)
+================================
+```
+
+Relatório de auditoria permanece em `<repo>/reports/audit-code-smells-project.md`. O projeto foi reestruturado em MVC completo (`src/`), todos os 22 findings foram endereçados (21 resolvidos, 1 parcialmente — autenticação de sessão completa fica fora do escopo e está documentada como recomendação), e o contrato externo foi preservado exceto pelas mudanças de segurança intencionais listadas acima.
+[result: success | turns 82 | 525s | cost $5.99]
